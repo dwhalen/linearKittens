@@ -621,7 +621,7 @@ function linearProgram (time) {
   numButtons = buttonCosts.length;
 
   //console.log(getValues(buttonList,"name"));
-  console.log("considering buttons:", getValues(buildableButtonList,"name"));
+  console.log("  Considering buttons:", getValues(buildableButtonList,"name"));
 
   // minimize objective such that matrix.x<=b
   matrixOfInequalities = [];
@@ -728,7 +728,7 @@ function linearProgram (time) {
 
   // need at least 0 of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-4);
+    rhs.push(1e-3);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -784,30 +784,40 @@ function linearProgram (time) {
   // Run the linear program
   solution = numeric.solveLP(objective,matrixOfInequalities,rhs);
   if(solution.message=="Infeasible") {
-    return "Infeasible";
+    console.log("no solution to the linear program found: defaulting to farming.");
+    tradesToDo=zeros(numTrades);
+    jobsToDo=zeros(numJobs);
+    bldsToDo=zeros(numBlds);
+    expectedResources=zeros(numResources);
+    buttonCompleteness=zeros(numButtons);
+
+    // everyone should be farming.  This is totally overkill, but it might work better than letting kittens starve
+    for (var i in jobsToDo) {
+      if (jobList[i].name=="farmer") {jobsToDo[i]=numKittens;}
+    }
+
+
+  } else {
+    // turn the solution into actual useful quantities
+    ci = 0;
+    tradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
+    //console.log("unadjustedtrades:",tradesToDo);
+    tradesToDo = numeric.ceil(numeric.sub(tradesToDo,tradeThreshold)); // Integerize
+    jobsToDo = solution.solution.slice(ci,ci + numJobs); ci+=numJobs;
+    bldsToDo = solution.solution.slice(ci,ci + numBlds); ci+=numBlds;
+    expectedResources = solution.solution.slice(ci,ci+numResources);ci+=numResources;
+    buttonCompleteness = solution.solution.slice(ci,ci+numButtons);ci+=numButtons;
   }
-
-
-
-  // turn this into actual useful quantities
-  ci = 0;
-  tradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
-  //console.log("unadjustedtrades:",tradesToDo);
-  tradesToDo = numeric.ceil(numeric.sub(tradesToDo,tradeThreshold)); // Integerize
-  jobsToDo = solution.solution.slice(ci,ci + numJobs); ci+=numJobs;
-  bldsToDo = solution.solution.slice(ci,ci + numBlds); ci+=numBlds;
-  expectedResources = solution.solution.slice(ci,ci+numResources);ci+=numResources;
-  buttonCompleteness = solution.solution.slice(ci,ci+numButtons);ci+=numButtons;
 
   // Hack for observatories.  They should *always* be on.
   for (var i in bldsToDo) {
     if (bldList[i].name=="observatory") {bldsToDo[i]=1;}
   }
 
-  console.log("tradesToDo",tradesToDo);
-  console.log("jobsToDo",dRound(jobsToDo));
-  console.log("expectedResources",dRound(expectedResources));
-  console.log("buttonCompleteness",dRound(buttonCompleteness));
+  //console.log("tradesToDo",tradesToDo);
+  //console.log("jobsToDo",dRound(jobsToDo));
+  //console.log("expectedResources",dRound(expectedResources));
+  //console.log("buttonCompleteness",dRound(buttonCompleteness));
 
   // generate the list of things we are allowed to build
   allowedButtons = [];
@@ -927,12 +937,12 @@ function planLoop () {
   console.log("  Attempting linear program.");
 
   out = linearProgram(60);
-  if (out == "Infeasible") {
-    clearTimeout(planLoopTimeout);planLoopTimeout=false;
-    if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, 60*1000);}
-    console.log("  Planning loop failed to find solution to linear program.  Trying again later.")
-    return;
-  }
+  //if (out == "Infeasible") {
+  //  clearTimeout(planLoopTimeout);planLoopTimeout=false;
+  //  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, 60*1000);}
+  //  console.log("  Planning loop failed to find solution to linear program.  Trying again later.")
+  //  return;
+  //}
 
 }
 
