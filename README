@@ -1,0 +1,19 @@
+linearKittens is an AI for automatically playing bloodrizer's Kittens Game:
+http://bloodrizer.ru/games/kittens/
+
+USING THE AI
+
+linearKittens needs to be loaded into the javascript console, which can be done with the command
+
+document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/linearKittens.js';
+
+Once linearKittens has been loaded, it can be started and stopped by running respectively
+
+startLinearKittens()
+stopLinearKittens()
+
+GUARANTEES
+
+linearKittens comes with no guarantees explicit or implied.  It may not work with the most recent version of the Kittens Game.  It may break your computer.  It may turn all of your tradeships into oil tankers.  It may starve all of your kittens to death or otherwise leave a smoking crater of your once-great kitten hegemony.
+
+
