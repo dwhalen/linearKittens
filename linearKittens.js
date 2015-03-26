@@ -477,6 +477,14 @@ function getBuildingResearchButtons() {
 
 function getResourceQuantityAndMax () {
   resourceQuantity = getValues(gamePage.resPool.resources,'value');
+  // subtract the reserve from catnip
+  for (var i in resourceQuantity) {
+    if (gamePage.resPool.resources[i].name=="catnip") {
+      var reserve = catnipReserve*gamePage.resPool.resources[i].maxValue;
+      resourceQuantity[i]=resourceQuantity[i]-reserve;
+    }
+  }
+
   resourceMax = getValues(gamePage.resPool.resources,'maxValue');
   for(var i in resourceMax){if (resourceMax[i]==0){resourceMax[i]=Infinity;}}
   resourceMax = numeric.mul(resourceFraction,resourceMax);
@@ -949,13 +957,6 @@ function planLoop () {
   console.log("  Attempting linear program.");
 
   out = linearProgram(60);
-  //if (out == "Infeasible") {
-  //  clearTimeout(planLoopTimeout);planLoopTimeout=false;
-  //  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, 60*1000);}
-  //  console.log("  Planning loop failed to find solution to linear program.  Trying again later.")
-  //  return;
-  //}
-
 }
 
 function printTrades() {
@@ -979,7 +980,7 @@ function executeLoop () {
   console.log("  Remaining trades:");
   printTrades();
 
-  // try to do all the trades. TODO make this faster by incorporating multiplicity
+  // try to do all the trades.
   for (var i in tradesToDo) {
     //console.log(tradesToDo[i]);
     if (tradesToDo[i]>0) {
