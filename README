@@ -16,4 +16,8 @@ GUARANTEES
 
 linearKittens comes with no guarantees explicit or implied.  It may not work with the most recent version of the Kittens Game.  It may break your computer.  It may turn all of your tradeships into oil tankers.  It may starve all of your kittens to death or otherwise leave a smoking crater of your once-great kitten hegemony.
 
+CREDIT
 
+linearKittens was written primarily by Daniel Whalen.
+
+Credit for two subroutines, autoPray and starClick, goes to Browsing_From_Work from https://www.reddit.com/r/kittensgame/comments/2eqlt5/a_few_kittens_game_scripts_ive_put_together/
