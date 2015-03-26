@@ -5,6 +5,29 @@ document.body.appendChild(document.createElement('script')).src='http://oranloon
 document.body.appendChild(document.createElement('script')).src='http://numericjs.com/numeric/lib/numeric-1.2.6.js';
 document.body.appendChild(document.createElement('script')).src='http://underscorejs.org/underscore.js';
 
+
+// Duration of a season in seconds
+seasonDuration = 200;
+
+// Number of ticks every second
+ticksPerSecond = gamePage.rate; //5
+
+// Maximum fraction of resource cap that we can score
+resourceFraction = 0.9;
+
+// Threshold for ignoring things in the linear programs
+tradeThreshold = 1e-2;
+
+// The most of any building that we can score for completing
+maximumBuildingPercentage=1.2;
+
+// The ideal number of trade ships
+maxTradeShips=5000;
+
+// The fraction of our max catnip that we will reserve for spontaneous season changes
+catnipReserve=0.05;
+
+
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
 function respawnCopy () {
@@ -452,26 +475,6 @@ function getBuildingResearchButtons() {
   return availablebuttons;
 }
 
-
-// Duration of a season in seconds
-seasonDuration = 200;
-
-// Number of ticks every second
-ticksPerSecond = gamePage.rate; //5
-
-// Maximum fraction of resource cap that we can score
-resourceFraction = 0.9;
-
-// Threshold for ignoring things in the linear programs
-tradeThreshold = 1e-2;
-
-// The most of any building that we can score for completing
-maximumBuildingPercentage=1.2;
-
-// The ideal number of trade ships
-maxTradeShips=5000;
-
-
 function getResourceQuantityAndMax () {
   resourceQuantity = getValues(gamePage.resPool.resources,'value');
   resourceMax = getValues(gamePage.resPool.resources,'maxValue');
@@ -509,6 +512,15 @@ function numPurchasable(prices) {
   var costVec = costToVector(prices);
   var localResourceQuantity = getValues(gamePage.resPool.resources,'value');
   localResourceQuantity=numeric.max(localResourceQuantity,0);
+
+  // impose the restriction that we need to reserve 5% of our max autoCatnip
+  for (var i in localResourceQuantity) {
+    if (gamePage.resPool.resources[i].name=="catnip") {
+      var reserve = catnipReserve*gamePage.resPool.resources[i].maxValue;
+      localResourceQuantity[i]=Math.max(0,localResourceQuantity[i]-reserve);
+    }
+  }
+
   var quotient = numeric.div(localResourceQuantity,costVec);
   for (var i in quotient) {
     if (localResourceQuantity[i]==0) {
