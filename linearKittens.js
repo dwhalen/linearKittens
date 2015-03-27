@@ -161,17 +161,17 @@ function getTradeRates () {
 
   //religion
   if (gamePage.religionTab.visible) {
-    if (gamePage.religionTab.refineBtn.visible) {
+    if (gamePage.religionTab.refineBtn && gamePage.religionTab.refineBtn.visible) {
       buttonlist.push(gamePage.religionTab.refineBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.refineBtn,false));
     }
 
-    if (gamePage.religionTab.sacrificeAlicornsBtn.visible) {
+    if (gamePage.religionTab.sacrificeAlicornsBtn && gamePage.religionTab.sacrificeAlicornsBtn.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeAlicornsBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeAlicornsBtn,false));
     }
 
-    if (gamePage.religionTab.sacrificeBtn.visible) {
+    if (gamePage.religionTab.sacrificeBtn && gamePage.religionTab.sacrificeBtn.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeBtn,false));
     }
@@ -205,14 +205,12 @@ function getProductionRateForBuilding (bld) {
   bld.on=0;
   recalculateProduction(gameCopy);
   var beforeResources=getValues(gameCopy.resPool.resources,"perTickUI");
-  //console.log(beforeResources);
 
   // turn all of our buildings on
   bld.on=bld.val;
 
   recalculateProduction(gameCopy);
   var afterResources=getValues(gameCopy.resPool.resources,"perTickUI");
-  //console.log(afterResources);
 
   var deltaResources = numeric.sub(afterResources,beforeResources);
 
@@ -452,7 +450,6 @@ function getBuildingResearchButtons() {
 
   transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
   for (var oi in objects) {
-    //console.log(oi);
     object = objects[oi];
     if (
       ((object.unlocked) && !(object.researched)) ||
@@ -460,7 +457,6 @@ function getBuildingResearchButtons() {
       (object.faith && object.upgradable && transcendenceResearched)
       ){
       // buildable in theory
-      //console.log(object.title,object.label);
       for (var bi=0;bi<buttonList.length;bi++) {
         bu=buttonList[bi];
         if (bu.name==object.title||bu.name==object.label) {break;}
@@ -477,13 +473,6 @@ function getBuildingResearchButtons() {
 
 function getResourceQuantityAndMax () {
   resourceQuantity = getValues(gamePage.resPool.resources,'value');
-  // subtract the reserve from catnip
-  for (var i in resourceQuantity) {
-    if (gamePage.resPool.resources[i].name=="catnip") {
-      var reserve = catnipReserve*gamePage.resPool.resources[i].maxValue;
-      resourceQuantity[i]=resourceQuantity[i]-reserve;
-    }
-  }
 
   resourceMax = getValues(gamePage.resPool.resources,'maxValue');
   for(var i in resourceMax){if (resourceMax[i]==0){resourceMax[i]=Infinity;}}
@@ -513,21 +502,25 @@ function getLPParameters (game) {
   numBlds = bldReturns.length;
 
   numResources = resourceQuantity.length;
+
+  reserveResources = resourceReserve();
 }
 
+
+function resourceReserve () {
+  var out = zeros(resourceMax.length);
+  for (var i in out) {
+    var res = gamePage.resPool.resources[i];
+    if (res.name=="catnip") {out[i]=res.maxValue*catnipReserve;}
+  }
+  return out;
+}
 
 function numPurchasable(prices) {
   var costVec = costToVector(prices);
   var localResourceQuantity = getValues(gamePage.resPool.resources,'value');
+  localResourceQuantity=numeric.sub(localResourceQuantity,reserveResources);
   localResourceQuantity=numeric.max(localResourceQuantity,0);
-
-  // impose the restriction that we need to reserve 5% of our max autoCatnip
-  for (var i in localResourceQuantity) {
-    if (gamePage.resPool.resources[i].name=="catnip") {
-      var reserve = catnipReserve*gamePage.resPool.resources[i].maxValue;
-      localResourceQuantity[i]=Math.max(0,localResourceQuantity[i]-reserve);
-    }
-  }
 
   var quotient = numeric.div(localResourceQuantity,costVec);
   for (var i in quotient) {
@@ -622,6 +615,7 @@ function sRound(num) {return +num.toFixed(2);}
 
 function linearProgram (time) {
   if (!time) {time = 0};
+  respawnCopy();
   getResourceQuantityAndMax();
   getLPParameters (gamePage);
   numResources = resourceMax.length;
@@ -633,7 +627,7 @@ function linearProgram (time) {
   var buttonCosts = [];
   for (var i in buttonList) {
     cost = costToVector(buttonList[i].getPrices());
-    if (isBuildable(cost,resourceMax)) {
+    if (isBuildable(cost,numeric.sub(resourceMax,reserveResources))) {
       buttonCosts.push(cost);
       buildableButtonList.push(buttonList[i]);
     }
@@ -782,7 +776,7 @@ function linearProgram (time) {
 
   // resources must be distributed to buildings
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(0);
+    rhs.push(-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -811,7 +805,7 @@ function linearProgram (time) {
     expectedResources=zeros(numResources);
     buttonCompleteness=zeros(numButtons);
 
-    // everyone should be farming.  This is totally overkill, but it might work better than letting kittens starve
+    // everyone should be farming.  This is overkill, but it might work better than letting kittens starve
     for (var i in jobsToDo) {
       if (jobList[i].name=="farmer") {jobsToDo[i]=numKittens;}
     }
@@ -821,7 +815,6 @@ function linearProgram (time) {
     // turn the solution into actual useful quantities
     ci = 0;
     tradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
-    //console.log("unadjustedtrades:",tradesToDo);
     tradesToDo = numeric.ceil(numeric.sub(tradesToDo,tradeThreshold)); // Integerize
     jobsToDo = solution.solution.slice(ci,ci + numJobs); ci+=numJobs;
     bldsToDo = solution.solution.slice(ci,ci + numBlds); ci+=numBlds;
@@ -948,8 +941,6 @@ function planLoop () {
   planningloopweather = gamePage.calendar.weather;
 
   refreshTabs();
-  respawnCopy();
-  getLPParameters(gamePage);
 
   buttonList = getBuildingResearchButtons();
   buttonList = buttonList.concat(getExtraButtons());
