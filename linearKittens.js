@@ -27,6 +27,10 @@ maxTradeShips=5000;
 // The fraction of our max catnip that we will reserve for spontaneous season changes
 catnipReserve=0.05;
 
+// The time between instances of running the planning and execution loops
+planningInterval = 60;
+executionInterval = 5;
+
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
@@ -473,6 +477,7 @@ function getBuildingResearchButtons() {
 
 function getResourceQuantityAndMax () {
   resourceQuantity = getValues(gamePage.resPool.resources,'value');
+  resourceQuantity=numeric.max(resourceQuantity,0);
 
   resourceMax = getValues(gamePage.resPool.resources,'maxValue');
   for(var i in resourceMax){if (resourceMax[i]==0){resourceMax[i]=Infinity;}}
@@ -509,6 +514,8 @@ function getLPParameters (game) {
 
 function resourceReserve () {
   var out = zeros(resourceMax.length);
+
+  if (gamePage.village.maxKittens<5) {return out;}
   for (var i in out) {
     var res = gamePage.resPool.resources[i];
     if (res.name=="catnip") {out[i]=res.maxValue*catnipReserve;}
@@ -561,7 +568,7 @@ function listFloor(list,r) {
 
 function canExplore() {
   if (!gamePage.diplomacyTab.visible) {return false;}
-
+  gameCopy.resPool.get("ship").value=gamePage.resPool.get("ship").value; // need to keep track of trade ships
   var race = gameCopy.diplomacy.unlockRandomRace();
   if (race) {
     respawnCopy();
@@ -742,7 +749,7 @@ function linearProgram (time) {
 
   // need at least 0 of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-3);
+    rhs.push(1e-3-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -934,7 +941,7 @@ function getExtraButtons() {
 
 function planLoop () {
   clearTimeout(planLoopTimeout);planLoopTimeout=false;
-  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, 60*1000);}
+  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, planningInterval*1000);}
 
   console.log ("PLANNING LOOP");
   planningloopseason = gamePage.calendar.season;
@@ -947,7 +954,7 @@ function planLoop () {
 
   console.log("  Attempting linear program.");
 
-  out = linearProgram(60);
+  out = linearProgram(planningInterval);
 }
 
 function printTrades() {
@@ -1130,8 +1137,9 @@ function startLinearKittens() {
   starClick = setInterval(starClickFunction, 1 * 1000);
   autopray = setInterval(autoPrayFunction,10*1000);
 
+  respawnCopy()
   planLoop();
-  executeInterval = setInterval(executeLoop,5*1000);
+  executeInterval = setInterval(executeLoop,executionInterval*1000);
 
 }
 
