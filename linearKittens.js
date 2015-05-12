@@ -6,9 +6,6 @@ document.body.appendChild(document.createElement('script')).src='http://numericj
 document.body.appendChild(document.createElement('script')).src='http://underscorejs.org/underscore.js';
 
 
-// Duration of a season in seconds
-seasonDuration = 200;
-
 // Number of ticks every second
 ticksPerSecond = gamePage.rate; //5
 
@@ -21,6 +18,9 @@ tradeThreshold = 1e-2;
 // The most of any building that we can score for completing
 maximumBuildingPercentage=1.2;
 
+// the resource cutoff before assuming infinite
+infiniteResources = 1e10;
+
 // The ideal number of trade ships
 maxTradeShips=5000;
 
@@ -30,6 +30,9 @@ catnipReserve=0.05;
 // The time between instances of running the planning and execution loops
 planningInterval = 60;
 executionInterval = 5;
+
+// A click event to pass to onclick functions
+genericEvent = {shiftKey:false};
 
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
@@ -64,7 +67,7 @@ function getValues (object,property) {
 // prepay is false if payment handled by btn.handler(), e.g. with crafts
 function getSingleTradeRate (button,prepay) {
   // set all current resources to 0.
-  setCopyResourcesToZero()
+  setCopyResourcesToZero();
 
   cost = button.getPrices();
   for(var j=0;j<cost.length;j++) {
@@ -80,7 +83,7 @@ function getSingleTradeRate (button,prepay) {
   if (button.handler) {
     button.handler(button); // some of these may take 0 arguments, instead
   } else {
-    button.onClick();
+    button.onClick(genericEvent);
   }
   afterResources = getValues(gameCopy.resPool.resources,"value");
   deltaResources = numeric.sub(afterResources,beforeResources);
@@ -586,7 +589,9 @@ function canExplore() {
 **********************************************************************
 **********************************************************************
 **********************************************************************
-This is straightforward.  It adds up a bunch of things
+This is straightforward.  It adds up a bunch of things.  We may want
+to rescale some of the rows with large numbers.
+
           trades    jobs    blds    res   buttons
 1                   1...1                         <=numKittens
 numJobs             -I                            <=0
@@ -766,6 +771,9 @@ function linearProgram (time) {
   buttonT = numeric.transpose(buttonCosts);
 
   for(var i=0;i<resourceNullRate.length;i++) {
+    // if we have infinite of this type of resource, ignore this line of the linear program
+    if (resourceQuantity[i]>infiniteResources) {continue;}
+
     // filter which resources we include: some of them don't work.
     if (resourceQuantity[i]<=0 && resourceNullRate[i]<0){
       rhs.push(1e-4);
@@ -1005,7 +1013,7 @@ function executeLoop () {
               button.payPrice();
               gamePage.villageTab.sendHunterSquad()
             } else {
-              if (button.handler) {button.handler(button);} else {button.onClick();}
+              if (button.handler) {button.handler(button);} else {button.onClick(genericEvent);}
             }
           }
         }
@@ -1035,9 +1043,10 @@ function executeLoop () {
   var toJobs = numeric.max(numeric.floor(jobsToDo),0);
   var totalJobs = listSum(toJobs);
   if (totalJobs>numKittens) { //game.village.getKittens();
-    console.error("  Too many jobs to assign to kittens.");
+    console.error("  Too few kittens for assigned jobs.");
     return;
   }
+
   // fuck the last kitten
   if (totalJobs<numKittens) {
     currentCDF=0;
@@ -1049,6 +1058,7 @@ function executeLoop () {
       }
     }
   }
+  var extraKittens = numKittens-totalJobs;
 
   // remove kittens from jobs
   for ( i in toJobs) {
@@ -1068,6 +1078,13 @@ function executeLoop () {
       getJobButton(job).update();
     }
   }
+  // any remaining kittens become farmers
+  for (i in toJobs) {
+    job = jobList[i];
+    if (job.name=="farmer") {
+      getJobButton(job).assignJobs(extraKittens);
+    }
+  }
 
   // Check whether we can build any of the the buildings
   for (i in allowedButtons) {
@@ -1076,8 +1093,8 @@ function executeLoop () {
     var canBuild = numPurchasable(buttonPrices);
     if (canBuild>0) {
       console.log("  Constructing",buildButton.name);
-      buildButton.onClick();
-      setTimeout(planLoop,1);
+      buildButton.onClick(genericEvent);
+      if (linearKittensOn) {setTimeout(planLoop,1);}
       return;
     }
   }
@@ -1086,7 +1103,7 @@ function executeLoop () {
   //If we changed season, we should run loop2 again.
   if(planningloopseason != gamePage.calendar.season||planningloopweather!=gamePage.calendar.weather) {
     console.log("  Season changed. Running the planning loop.");
-    if (linearKittensOn) {planLoop();}
+    if (linearKittensOn) {setTimeout(planLoop,1);}
   }
 }
 
@@ -1125,7 +1142,7 @@ function autoPrayFunction() {  //modified autopray
 
 linearKittensOn = false;
 starClick=false;
-autopray=false
+autopray=false;
 autoCatnip=false;
 executeInterval = false;
 planLoopTimeout=false;
@@ -1137,7 +1154,7 @@ function startLinearKittens() {
   starClick = setInterval(starClickFunction, 1 * 1000);
   autopray = setInterval(autoPrayFunction,10*1000);
 
-  respawnCopy()
+  respawnCopy();
   planLoop();
   executeInterval = setInterval(executeLoop,executionInterval*1000);
 
