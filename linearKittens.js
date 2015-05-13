@@ -111,10 +111,10 @@ function setCopyResourcesToZero () {
 }
 function getSingelHuntRateWithoutCost () {
   setCopyResourcesToZero();
-  beforeResources = getValues(gameCopy.resPool.resources,"value");
-  gameCopy.villageTab.sendHunterSquad();
-  afterResources = getValues(gameCopy.resPool.resources,"value");
-  deltaResources = numeric.sub(afterResources,beforeResources);
+  var beforeResources = getValues(gameCopy.resPool.resources,"value");
+  gameCopy.village.sendHuntersInternal();  //previously: gameCopy.villageTab.sendHunterSquad();
+  var afterResources = getValues(gameCopy.resPool.resources,"value");
+  var deltaResources = numeric.sub(afterResources,beforeResources);
   return deltaResources;
 }
 
