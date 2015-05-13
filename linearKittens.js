@@ -493,6 +493,25 @@ function getResourceQuantityAndMax () {
   resourceMax = numeric.mul(resourceFraction,resourceMax);
 }
 
+
+resourceGlobalMaxes=false;
+function updateResourceGlobalMaxes(){
+  // update resourceGlobalMaxes: the most of each resource that we've ever seen
+  if (resourceGlobalMaxes===false) {
+    // resourceGlobalMaxes will be used as a scaling factor to determine epsilon in the LP
+    resourceGlobalMaxes = numeric.add(zeros(gamePage.resPool.resources.length),1);
+  }
+
+  for (var i in resourceGlobalMaxes) {
+    if (resourceMax[i]==Infinity) {
+      resourceGlobalMaxes[i] = Math.max(resourceGlobalMaxes[i],resourceQuantity[i]);
+    } else {
+      resourceGlobalMaxes[i] = Math.max(resourceGlobalMaxes[i],resourceMax[i]);
+    }
+  }
+}
+
+
 function getLPParameters (game) {
   maxKittens = game.village.maxKittens;
   numKittens = game.village.getKittens();
@@ -518,6 +537,8 @@ function getLPParameters (game) {
   numResources = resourceQuantity.length;
 
   reserveResources = resourceReserve();
+
+  updateResourceGlobalMaxes();
 }
 
 
@@ -777,7 +798,7 @@ function linearProgram (time) {
 
   // need at least epsilon of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-3-reserveResources[resNumber]);
+    rhs.push(1e-6*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -799,9 +820,9 @@ function linearProgram (time) {
 
     // filter which resources we include: some of them don't work.
     if (resourceQuantity[i]<=0 && resourceNullRate[i]<0){
-      rhs.push(1e-4);
+      rhs.push(1e-6*resourceGlobalMaxes[i]);
     } else {
-      rhs.push(resourceQuantity[i]+resourceNullRate[i]*time*ticksPerSecond+1e-4);
+      rhs.push(resourceQuantity[i]+resourceNullRate[i]*time*ticksPerSecond+1e-6*resourceGlobalMaxes[i]);
     }
     matrixOfInequalities.push([].concat(
       numeric.mul(tradeT[i],-1),
@@ -814,7 +835,7 @@ function linearProgram (time) {
 
   // resources must be distributed to buildings
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-6-reserveResources[resNumber]);
+    rhs.push(1e-6*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
