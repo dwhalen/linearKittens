@@ -31,8 +31,14 @@ catnipReserve=0.05;
 planningInterval = 60;
 executionInterval = 5;
 
-// A click event to pass to onclick functions
+// A click event to pass to onClick functions
 genericEvent = {shiftKey:false};
+
+// Determine whether linearKittens pauses the game while it executes the planning loop.
+// This could be useful on slower computers or if gamePage.rate is large.  Leaving it on
+// will cause a 10-30% slow-down in game speed.  This can be modified after loading the
+// script.
+pauseDuringCalculations = true;
 
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
@@ -104,7 +110,7 @@ function setCopyResourcesToZero () {
   }
 }
 function getSingelHuntRateWithoutCost () {
-  setCopyResourcesToZero()
+  setCopyResourcesToZero();
   beforeResources = getValues(gameCopy.resPool.resources,"value");
   gameCopy.villageTab.sendHunterSquad();
   afterResources = getValues(gameCopy.resPool.resources,"value");
@@ -580,6 +586,18 @@ function canExplore() {
   return false;
 }
 
+function randomInteger(probs) {
+  var normalizedProbs = numeric.div(probs,1.0*listSum(probs));
+  var random = Math.random();
+
+  var accumulation = 0;
+  for (var i in probs) {
+    accumulation += normalizedProbs[i];
+    if (accumulation>random) {return i;}
+  }
+  return -1;
+}
+
 /* LINEAR PROGRAM
 **********************************************************************
 **********************************************************************
@@ -602,8 +620,13 @@ numButtons                                I       <=maximumBuildingPercentage
 numButtons                                -I      <=0
 numRes                              I             <=0.9*maxRes
 numRes                              -I            <=0
-rumRes    -rates    -jobs*T -blds*T I             <=resStart+nullRate*T
+numRes    -rates    -jobs*T -blds*T I             <=resStart+nullRate*T
 numRes                              -I    costs   <=0
+
+In order to make the linear program happier, we may want to rescale some of the rows and
+columns.  Perform res->res/maxres  and divide all the res rows by maxres.
+
+This may lead to numbers that are too low...  Maybe rescale trades?
 
 objective:                                -1...-1
 
@@ -626,7 +649,7 @@ function dRound(x) {
 function sRound(num) {return +num.toFixed(2);}
 
 function linearProgram (time) {
-  if (!time) {time = 0};
+  if (!time) {time = 0;}
   respawnCopy();
   getResourceQuantityAndMax();
   getLPParameters (gamePage);
@@ -837,11 +860,6 @@ function linearProgram (time) {
     buttonCompleteness = solution.solution.slice(ci,ci+numButtons);ci+=numButtons;
   }
 
-  // Hack for observatories.  They should *always* be on.
-  for (var i in bldsToDo) {
-    if (bldList[i].name=="observatory") {bldsToDo[i]=1;}
-  }
-
   //console.log("tradesToDo",tradesToDo);
   //console.log("jobsToDo",dRound(jobsToDo));
   //console.log("expectedResources",dRound(expectedResources));
@@ -859,8 +877,8 @@ function linearProgram (time) {
 
   console.log("  Planned constructions:");
   for (var i in buttonCompleteness) {
-    if (buttonCompleteness[i]>.001) {
-      console.log("   ",buildableButtonList[i].name,Math.round(100*buttonCompleteness[i]),"%");
+    if (buttonCompleteness[i]>0.001) {
+      console.log("   ",buildableButtonList[i].name,":",Math.round(100*buttonCompleteness[i]),"%");
     }
   }
 
@@ -868,7 +886,7 @@ function linearProgram (time) {
   //console.log("tradesToDo",tradesToDo);
   console.log("  Job distribution:");
   for (var i in jobsToDo) {
-    if(jobsToDo[i]>.005) {console.log("   ",jobList[i].title,":",sRound(jobsToDo[i]));}
+    if(jobsToDo[i]>0.005) {console.log("   ",jobList[i].title,":",sRound(jobsToDo[i]));}
   }
 
   console.log("  Trades:");
@@ -951,6 +969,14 @@ function planLoop () {
   clearTimeout(planLoopTimeout);planLoopTimeout=false;
   if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, planningInterval*1000);}
 
+  // pause if we need to
+  var priorIsPaused;
+  if (pauseDuringCalculations) {
+    priorIsPaused = gamePage.isPaused;
+    if (!gamePage.isPaused) {gamePage.togglePause();}
+  }
+
+
   console.log ("PLANNING LOOP");
   planningloopseason = gamePage.calendar.season;
   planningloopweather = gamePage.calendar.weather;
@@ -963,6 +989,15 @@ function planLoop () {
   console.log("  Attempting linear program.");
 
   out = linearProgram(planningInterval);
+
+
+
+  // unpause if we need to
+  if (pauseDuringCalculations) {
+    if (priorIsPaused != gamePage.isPaused) {
+      gamePage.togglePause();
+    }
+  }
 }
 
 function printTrades() {
@@ -980,7 +1015,7 @@ function printTrades() {
 // Do this every second
 loop3Counter = 0;
 function executeLoop () {
-  loop3Counter=(loop3Counter+1)%10
+  loop3Counter=(loop3Counter+1)%10;
 
   console.log ("EXECUTION LOOP");
   console.log("  Remaining trades:");
@@ -995,7 +1030,7 @@ function executeLoop () {
       var costs = button.getPrices();
       var canBuild = numPurchasable(costs);
       //console.log(costs,canBuild);
-      canBuild = Math.min(canBuild,tradesToDo[i])
+      canBuild = Math.min(canBuild,tradesToDo[i]);
       tradesToDo[i]-=canBuild;
       if (canBuild>0) {
         if (button.craftName) {
@@ -1040,25 +1075,34 @@ function executeLoop () {
 
   // assign kittens to the appropriate jobs
   // do so cleverly, or something, by minimizing number of operations.
+  numKittens = gamePage.village.getKittens();
   var toJobs = numeric.max(numeric.floor(jobsToDo),0);
+  var expectedKittens = Math.round(listSum(jobsToDo));
   var totalJobs = listSum(toJobs);
   if (totalJobs>numKittens) { //game.village.getKittens();
     console.error("  Too few kittens for assigned jobs.");
     return;
   }
 
-  // fuck the last kitten
-  if (totalJobs<numKittens) {
-    currentCDF=0;
-    for (var i in jobsToDo) {
-      currentCDF+=jobsToDo[i]-toJobs[i];
-      if (currentCDF>.1+(loop3Counter/10.01)) {
-        toJobs[i]++
-        break;
-      }
-    }
+  //Override if below the catnip reserve.  Ignore the other reserves for now.
+  //Every kitten should forget his job, so they all get treated as unaccounted kittens.
+  var catnipRes = gamePage.resPool.get('catnip');
+  if(catnipRes.value<catnipReserve*catnipRes.maxValue) {
+    toJobs = numeric.mul(0,toJobs);
+    expectedKittens=0;
+    totalJobs=0;
   }
-  var extraKittens = numKittens-totalJobs;
+
+  // randomly assign the last kitten
+  var randomKittens = expectedKittens-totalJobs;
+  deltaJobs = numeric.sub(jobsToDo,toJobs);
+  for (i=0;i<randomKittens;i++) {
+    var randomJob = randomInteger(deltaJobs);
+    toJobs[i]+=1;
+  }
+
+  var extraKittens = numKittens-expectedKittens; // one extra kitten is destributed in the last kitten step
+  //if (extraKittens>0) {console.log('DEBUG: extra kittens:',extraKittens);}
 
   // remove kittens from jobs
   for ( i in toJobs) {
@@ -1079,13 +1123,16 @@ function executeLoop () {
     }
   }
   // any remaining kittens become farmers
-  for (i in toJobs) {
-    job = jobList[i];
-    if (job.name=="farmer") {
-      getJobButton(job).assignJobs(extraKittens);
+  if (extraKittens>0) {
+    for (i in toJobs) {
+      job = jobList[i];
+      if (job.name=="farmer") {
+        getJobButton(job).assignJobs(extraKittens);
+        getJobButton(job).update();
+        //if (extraKittens>0) {console.log('DEBUG: assigned extra kittens');}
+      }
     }
   }
-
   // Check whether we can build any of the the buildings
   for (i in allowedButtons) {
     var buildButton = allowedButtons[i];
@@ -1128,7 +1175,7 @@ function autoPrayFunction() {  //modified autopray
 
     // no spending faith if we're saving up for it.
     if ("testCosts" in window) {
-      for(i in testCosts) {
+      for(var i in testCosts) {
         if (testCosts[i].name == "faith") {return;}
       }
     }
