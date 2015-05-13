@@ -616,12 +616,12 @@ numJobs             -I                            <=0
 numTrades -I                                      <=0
 numBlds                     -I                    <=0
 numBlds                      I                    <=1
-numButtons                                I       <=maximumBuildingPercentage
 numButtons                                -I      <=0
+numButtons                                I       <=maximumBuildingPercentage
 numRes                              I             <=0.9*maxRes
-numRes                              -I            <=0
-numRes    -rates    -jobs*T -blds*T I             <=resStart+nullRate*T
-numRes                              -I    costs   <=0
+numRes                              -I            <=epsilon-resourceReserve
+numRes    -rates    -jobs*T -blds*T I             <=epsilon+resStart+nullRate*T
+numRes                              -I    costs   <=epsilon
 
 In order to make the linear program happier, we may want to rescale some of the rows and
 columns.  Perform res->res/maxres  and divide all the res rows by maxres.
@@ -775,7 +775,7 @@ function linearProgram (time) {
     }
   }
 
-  // need at least 0 of each resource
+  // need at least epsilon of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
     rhs.push(1e-3-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
@@ -814,7 +814,7 @@ function linearProgram (time) {
 
   // resources must be distributed to buildings
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(-reserveResources[resNumber]);
+    rhs.push(1e-6-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -967,7 +967,6 @@ function getExtraButtons() {
 
 function planLoop () {
   clearTimeout(planLoopTimeout);planLoopTimeout=false;
-  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, planningInterval*1000);}
 
   // pause if we need to
   var priorIsPaused;
@@ -991,7 +990,7 @@ function planLoop () {
   out = linearProgram(planningInterval);
 
 
-
+  if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, planningInterval*1000);}
   // unpause if we need to
   if (pauseDuringCalculations) {
     if (priorIsPaused != gamePage.isPaused) {
@@ -1015,10 +1014,9 @@ function printTrades() {
 // Do this every second
 loop3Counter = 0;
 function executeLoop () {
-  loop3Counter=(loop3Counter+1)%10;
-
   console.log ("EXECUTION LOOP");
   console.log("  Remaining trades:");
+  loop3Counter = (loop3Counter+1)%10;
   printTrades();
 
   // try to do all the trades.
@@ -1093,7 +1091,7 @@ function executeLoop () {
     totalJobs=0;
   }
 
-  // randomly assign the last kitten
+  // randomly assign the last expected kittens
   var randomKittens = expectedKittens-totalJobs;
   deltaJobs = numeric.sub(jobsToDo,toJobs);
   for (i=0;i<randomKittens;i++) {
