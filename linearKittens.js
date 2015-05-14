@@ -464,11 +464,12 @@ function getBuildingResearchButtons() {
   transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
   for (var oi in objects) {
     object = objects[oi];
-    if (
-      ((object.unlocked) && !(object.researched)) ||
+    if (// the faith part follows the definition of updateEnabled in religion.js
       (object.unlocked && object.upgradable && !object.faith) ||
+      ((object.unlocked) && !(object.researched)&& !object.faith) ||
+      (object.faith && !object.researched)||
       (object.faith && object.upgradable && transcendenceResearched)
-      ){
+      ) {
       // buildable in theory
       for (var bi=0;bi<buttonList.length;bi++) {
         bu=buttonList[bi];
@@ -760,7 +761,7 @@ function linearProgram (time) {
 
   // can't build less than 0 of each button
   for(var buttonNumber = 0;buttonNumber<numButtons;buttonNumber++) {
-    rhs.push(0);
+    rhs.push(1e-8);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -798,7 +799,7 @@ function linearProgram (time) {
 
   // need at least epsilon of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-6*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
+    rhs.push(1e-5*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -820,9 +821,9 @@ function linearProgram (time) {
 
     // filter which resources we include: some of them don't work.
     if (resourceQuantity[i]<=0 && resourceNullRate[i]<0){
-      rhs.push(1e-6*resourceGlobalMaxes[i]);
+      rhs.push(1e-5*resourceGlobalMaxes[i]);
     } else {
-      rhs.push(resourceQuantity[i]+resourceNullRate[i]*time*ticksPerSecond+1e-6*resourceGlobalMaxes[i]);
+      rhs.push(resourceQuantity[i]+resourceNullRate[i]*time*ticksPerSecond+1e-5*resourceGlobalMaxes[i]);
     }
     matrixOfInequalities.push([].concat(
       numeric.mul(tradeT[i],-1),
@@ -835,7 +836,7 @@ function linearProgram (time) {
 
   // resources must be distributed to buildings
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-6*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
+    rhs.push(1e-5*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -873,8 +874,8 @@ function linearProgram (time) {
   } else {
     // turn the solution into actual useful quantities
     ci = 0;
-    tradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
-    tradesToDo = numeric.ceil(numeric.sub(tradesToDo,tradeThreshold)); // Integerize
+    realTradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
+    tradesToDo = numeric.ceil(numeric.sub(realTradesToDo,tradeThreshold)); // Integerize
     jobsToDo = solution.solution.slice(ci,ci + numJobs); ci+=numJobs;
     bldsToDo = solution.solution.slice(ci,ci + numBlds); ci+=numBlds;
     expectedResources = solution.solution.slice(ci,ci+numResources);ci+=numResources;
@@ -911,7 +912,8 @@ function linearProgram (time) {
   }
 
   console.log("  Trades:");
-  printTrades();
+  //printTrades();
+  printRealTrades();
 
   //console.log("  Partial constructions:")
   //for (var i in allowedButtons) {
@@ -1027,6 +1029,17 @@ function printTrades() {
         console.log("   ",tradeButtons[i].race.name,":",tradesToDo[i]);
       } else {
         console.log("   ",tradeButtons[i].name,":",tradesToDo[i]);
+      }
+    }
+  }
+}
+function printRealTrades() {
+  for (var i in realTradesToDo) {
+    if (tradesToDo[i]>tradeThreshold) {
+      if (tradeButtons[i].race) {
+        console.log("   ",tradeButtons[i].race.name,":",sRound(realTradesToDo[i]));
+      } else {
+        console.log("   ",tradeButtons[i].name,":",sRound(realTradesToDo[i]));
       }
     }
   }
