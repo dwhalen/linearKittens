@@ -51,7 +51,15 @@ autoBuy = true;
 // set this to false;
 performUncappedTrades=true;
 
+// This adds additional utility in the LP for simply gathering additional resources.
+// The bonus provided is some fraction of the resource maximum.
+scoreAccumulatedResources = false;
 
+// Tell the LP that faith is unlimited.  This will be permit the LP to generate
+// more faith while running scoreAccumulatedResources=true;
+// I recommend not activating this, since it might turn your entire economy towards
+// faith generation.
+ignoreFaithCap = false;
 
 
 
@@ -60,8 +68,8 @@ performUncappedTrades=true;
 // The most consistant way to handle this is probably to calculate them when we read
 // in the corresponding objects, but this will work for the moment..
 function buildableWeight(button) {
-  if ('tab' in button && button.tab.tabId=="Workshop") {return 10;}
-  if ('tab' in button && button.tab.tabId=="Science") {return 10;}
+  if (button.tab && button.tab.tabId=="Workshop") {return 10;}
+  if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}
   return 1;
 }
@@ -535,6 +543,12 @@ function updateResourceGlobalMaxes(){
       resourceGlobalMaxes[i] = Math.max(resourceGlobalMaxes[i],resourceMax[i]);
     }
   }
+
+  // we also update resourceGlobalMaxes based off expectedResources.  This is useful for technical
+  // reasons when performUncappedTrades = false.
+  if ('expectedResources' in window) {
+    resourceGlobalMaxes = numeric.max(resourceGlobalMaxes,expectedResources);
+  }
 }
 
 
@@ -571,6 +585,7 @@ function getLPParameters (game) {
 function resourceReserve () {
   var out = zeros(resourceMax.length);
 
+  // no reserve until we have at least 5 kittens
   if (gamePage.village.maxKittens<5) {return out;}
   for (var i in out) {
     var res = gamePage.resPool.resources[i];
@@ -599,7 +614,7 @@ function usesLimitedResources(prices) {
   var resMax = getValues(gamePage.resPool.resources,'maxValue'); //max value of 0 means infinite
 
   for (i in costVec) {
-    if (costVec[i]>0&&rexMax[i]>0) {return true;}
+    if (costVec[i]>0&&resMax[i]>0) {return true;}
   }
   return false;
 }
@@ -826,6 +841,10 @@ function linearProgram (time) {
   // can't store more resources than our max
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
     if (resourceMax[resNumber]<Infinity) {
+
+      // check if faith
+      if (ignoreFaithCap && gamePage.resPool.resources[resNumber].name=='fath') {continue;}
+
       rhs.push(resourceMax[resNumber]);
       matrixOfInequalities.push([].concat(
           zeros(numTrades),
@@ -886,12 +905,21 @@ function linearProgram (time) {
     ));
   }
 
+  // The contribution to the objective for gathering resources.  Resources are scored even if they are spent
+  // on buildings.
+  var resObjective;
+  if (scoreAccumulatedResources) {
+    resObjective = numeric.div(-1.0,resourceGlobalMaxes);
+  } else {
+    resObjective = zeros(numResources);
+  }
+
   // Finished all the rows.  Construct the objective.
   objective = [].concat(
     zeros(numTrades),
     zeros(numJobs),
     zeros(numBlds),
-    zeros(numResources),
+    resObjective,
     numeric.mul(buttonWeights,-1) //previously numeric.add(zeros(numButtons),-1)
   );
 
@@ -1122,7 +1150,7 @@ function executeLoop () {
           button.tradeMultiple(canBuild);
         } else {
           //try to trade one at a time...
-          console.log(button.name, canBuild);
+          //console.log(button.name, canBuild);
           for (var i=0;i<canBuild;i++) {
             // hunts need to be treated differently, for some reason.
             if (button.name=="Send hunters") {
