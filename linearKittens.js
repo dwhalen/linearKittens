@@ -53,6 +53,19 @@ performUncappedTrades=true;
 
 
 
+
+
+
+// The weights for the buildables, used to prioritize certain buildings or research
+// The most consistant way to handle this is probably to calculate them when we read
+// in the corresponding objects, but this will work for the moment..
+function buildableWeight(button) {
+  if ('tab' in button && button.tab.tabId=="Workshop") {return 10;}
+  if ('tab' in button && button.tab.tabId=="Science") {return 10;}
+  if ('transcendence' in button) {return 10;}
+  return 1;
+}
+
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
 function respawnCopy () {
@@ -667,13 +680,12 @@ numRes                              -I            <=epsilon-resourceReserve
 numRes    -rates    -jobs*T -blds*T I             <=epsilon+resStart+nullRate*T
 numRes                              -I    costs   <=epsilon
 
-In order to make the linear program happier, we may want to rescale some of the rows and
-columns.  Perform res->res/maxres  and divide all the res rows by maxres.
-
-This may lead to numbers that are too low...  Maybe rescale trades?
-
 objective:                                -1...-1
 
+
+In order to make the linear program happier, we may want to rescale some of the rows and
+columns.  Perform res->res/maxres  and divide all the res rows by maxres.
+This may lead to numbers that are too low...  Maybe rescale trades?
 */
 function isBuildable (costVector, maxResources) {
   for (var i in costVector) {
@@ -713,7 +725,13 @@ function linearProgram (time) {
   }
   numButtons = buttonCosts.length;
 
-  //console.log(getValues(buttonList,"name"));
+  //evaluate the weights for all the buttons
+  buttonWeights = [];
+  for (i in buildableButtonList) {
+    buttonWeights.push(buildableWeight(buildableButtonList[i]));
+  }
+
+  //List the buttons that we're considering
   console.log("  Considering buttons:", getValues(buildableButtonList,"name"));
 
   // minimize objective such that matrix.x<=b
@@ -874,7 +892,7 @@ function linearProgram (time) {
     zeros(numJobs),
     zeros(numBlds),
     zeros(numResources),
-    numeric.add(zeros(numButtons),-1)
+    numeric.mul(buttonWeights,-1) //previously numeric.add(zeros(numButtons),-1)
   );
 
   // Run the linear program
@@ -1012,6 +1030,7 @@ function getExtraButtons() {
 
 function planLoop () {
   clearTimeout(planLoopTimeout);planLoopTimeout=false;
+  if (!linearKittensOn) {return;}
 
   // pause if we need to
   var priorIsPaused;
@@ -1070,6 +1089,8 @@ function printRealTrades() {
 // Do this every second
 loop3Counter = 0;
 function executeLoop () {
+  if (!linearKittensOn) {return;}
+
   console.log ("EXECUTION LOOP");
   console.log("  Remaining trades:");
   loop3Counter = (loop3Counter+1)%10;
@@ -1228,29 +1249,29 @@ function autoCatnipFunction() {
 //starclick and autopray by Browsing_From_Work from https://www.reddit.com/r/kittensgame/comments/2eqlt5/a_few_kittens_game_scripts_ive_put_together/
 //clearInterval(starClick);clearInterval(autoPray);
 function starClickFunction () { $("#gameLog").find("input").click(); }
-function autoPrayFunction() {  //modified autopray
-    var origTab = gamePage.activeTabId;
-    var faith = gamePage.resPool.get('faith');
+function autoPrayFunction() {  //heavily modified autopray
+  // exit if we haven't unlocked the relgion tab yet
+  if (!gamePage.religionTab.visible) {return;}
 
-    // no spending faith if we're saving up for it.
-    if (autoBuy) {// we shouldn't save faith if we're not planning on buying the buildings anyway.
-      if ("testCosts" in window) {
-        for(var i in testCosts) {
-          if (testCosts[i].name == "faith") {return;}
-        }
+  faith = gamePage.resPool.get('faith');
+
+  // no spending faith if we're saving up for it.
+  if (autoBuy) { // we shouldn't save faith if we're not planning on buying the buildings anyway.
+    if ("testCosts" in window) {
+      for(var i in testCosts) {
+        if (testCosts[i].name == "faith") {return;}
       }
     }
+  }
 
-    if (faith.value / faith.maxValue > 0.90) {
-        gamePage.activeTabId = 'Religion'; gamePage.render();
-        $(".btnContent:contains('Praise the sun')").click();
-        gamePage.activeTabId = origTab; gamePage.render();
-    }
+  if (faith.value > 0.90*faith.maxValue) {
+    gamePage.religionTab.praiseBtn.onClick();
+  }
 }
 
 linearKittensOn = false;
 starClick=false;
-autopray=false;
+autoPray=false;
 autoCatnip=false;
 executeInterval = false;
 planLoopTimeout=false;
@@ -1260,7 +1281,7 @@ function startLinearKittens() {
   linearKittensOn = true;
   autoCatnip = setInterval(autoCatnipFunction,2000);
   starClick = setInterval(starClickFunction, 1 * 1000);
-  autopray = setInterval(autoPrayFunction,10*1000);
+  autoPray = setInterval(autoPrayFunction,10*1000);
 
   respawnCopy();
   planLoop();
@@ -1272,6 +1293,6 @@ function stopLinearKittens() {
   linearKittensOn = false;
   clearInterval(autoCatnip);
   clearInterval(starClick);
-  clearInterval(autopray);
+  clearInterval(autoPray);
   clearInterval(executeInterval);
 }
