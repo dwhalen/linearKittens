@@ -40,6 +40,18 @@ genericEvent = {shiftKey:false};
 // script.
 pauseDuringCalculations = true;
 
+// If autoBuy is on, linearKittens will buy the buildings that it has planned for.
+// If you are using linearKittens as a resource automation script, then you should
+// set this to false;
+autoBuy = true;
+
+// If performUncappedTrades is false, linearKittens will not perform trades when the costs
+// are uncapped.
+// If you are using linearKittens as a resource automation script, then you should
+// set this to false;
+performUncappedTrades=true;
+
+
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
@@ -569,6 +581,16 @@ function numPurchasable(prices) {
 
   return Math.floor(listMin(quotient));
 }
+function usesLimitedResources(prices) {
+  var costVec = costToVector(prices);
+  var resMax = getValues(gamePage.resPool.resources,'maxValue'); //max value of 0 means infinite
+
+  for (i in costVec) {
+    if (costVec[i]>0&&rexMax[i]>0) {return true;}
+  }
+  return false;
+}
+
 function listSum(array) {
   var count=0;
   for (var i=array.length; i--;) {
@@ -1061,6 +1083,12 @@ function executeLoop () {
       var button = tradeButtons[i];
       var costs = button.getPrices();
       var canBuild = numPurchasable(costs);
+
+      // at this point, check to see whether performUncappedTrades prevents this trade
+      if (!performUncappedTrades && !usesLimitedResources(costs)) {
+        continue;
+      }
+
       //console.log(costs,canBuild);
       canBuild = Math.min(canBuild,tradesToDo[i]);
       tradesToDo[i]-=canBuild;
@@ -1133,8 +1161,7 @@ function executeLoop () {
     toJobs[i]+=1;
   }
 
-  var extraKittens = numKittens-expectedKittens; // one extra kitten is destributed in the last kitten step
-  //if (extraKittens>0) {console.log('DEBUG: extra kittens:',extraKittens);}
+  var extraKittens = numKittens-expectedKittens;
 
   // remove kittens from jobs
   for ( i in toJobs) {
@@ -1161,23 +1188,23 @@ function executeLoop () {
       if (job.name=="farmer") {
         getJobButton(job).assignJobs(extraKittens);
         getJobButton(job).update();
-        //if (extraKittens>0) {console.log('DEBUG: assigned extra kittens');}
       }
     }
   }
   // Check whether we can build any of the the buildings
-  for (i in allowedButtons) {
-    var buildButton = allowedButtons[i];
-    buttonPrices=buildButton.getPrices();
-    var canBuild = numPurchasable(buttonPrices);
-    if (canBuild>0) {
-      console.log("  Constructing",buildButton.name);
-      buildButton.onClick(genericEvent);
-      if (linearKittensOn) {setTimeout(planLoop,1);}
-      return;
+  if (autoBuy) { // if autoBuy is off, we can ignore this entire step.
+    for (i in allowedButtons) {
+      var buildButton = allowedButtons[i];
+      buttonPrices=buildButton.getPrices();
+      var canBuild = numPurchasable(buttonPrices);
+      if (canBuild>0) {
+        console.log("  Constructing",buildButton.name);
+        buildButton.onClick(genericEvent);
+        if (linearKittensOn) {setTimeout(planLoop,1);}
+        return;
+      }
     }
   }
-
 
   //If we changed season, we should run loop2 again.
   if(planningloopseason != gamePage.calendar.season||planningloopweather!=gamePage.calendar.weather) {
@@ -1206,9 +1233,11 @@ function autoPrayFunction() {  //modified autopray
     var faith = gamePage.resPool.get('faith');
 
     // no spending faith if we're saving up for it.
-    if ("testCosts" in window) {
-      for(var i in testCosts) {
-        if (testCosts[i].name == "faith") {return;}
+    if (autoBuy) {// we shouldn't save faith if we're not planning on buying the buildings anyway.
+      if ("testCosts" in window) {
+        for(var i in testCosts) {
+          if (testCosts[i].name == "faith") {return;}
+        }
       }
     }
 
