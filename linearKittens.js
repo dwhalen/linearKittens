@@ -9,8 +9,14 @@ document.body.appendChild(document.createElement('script')).src='http://undersco
 // Number of ticks every second
 ticksPerSecond = gamePage.rate; //5
 
-// Maximum fraction of resource cap that we can score
-resourceFraction = 0.9;
+/* Maximum fraction of resource cap that we can score and use to build.  Useful
+because it helps prevent loss from steamworks automation. This is subdivided into
+automationResourceCap, which applies to wood, minerals, and iron, scienceResourceCap,
+which applies to science and faith, and resourceCap, which applies to all other
+resources. */
+automationResourceCap = 0.9;
+scienceResourceCap = 1.0;
+resourceCap = 0.99;
 
 // Threshold for ignoring things in the linear programs
 tradeThreshold = 1e-2;
@@ -34,10 +40,10 @@ executionInterval = 5;
 // A click event to pass to onClick functions
 genericEvent = {shiftKey:false};
 
-// Determine whether linearKittens pauses the game while it executes the planning loop.
-// This could be useful on slower computers or if gamePage.rate is large.  Leaving it on
-// will cause a 10-30% slow-down in game speed.  This can be modified after loading the
-// script.
+/* Determine whether linearKittens pauses the game while it executes the planning loop.
+This could be useful on slower computers or if gamePage.rate is large.  Leaving it on
+will cause a 10-30% slow-down in game speed.  This can be modified after loading the
+script. */
 pauseDuringCalculations = true;
 
 // If autoBuy is on, linearKittens will buy the buildings that it has planned for.
@@ -51,9 +57,11 @@ autoBuy = true;
 // set this to false;
 performUncappedTrades=true;
 
-// This adds additional utility in the LP for simply gathering additional resources.
-// The bonus provided is some fraction of the resource maximum.
+/* This adds additional utility in the LP for simply gathering additional resources.
+The bonus provided is some fraction of the resource maximum which is multiplied by the
+corresponding resourceWeight. */
 scoreAccumulatedResources = false;
+resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights[gamePage.resPool.resources[i].name]=1;}
 
 // Tell the LP that faith is unlimited.  This will be permit the LP to generate
 // more faith while running scoreAccumulatedResources=true;
@@ -73,6 +81,22 @@ function buildableWeight(button) {
   if ('transcendence' in button) {return 10;}
   return 1;
 }
+
+
+// The function that generates the resource caps.  This can be customized as desired.
+function getResourceMax(resource) {
+  var cap = resource.maxValue;
+  if (cap==0) {return Infinity;}
+
+  if(resource.name=="wood"||resource.name=="minerals"||resource.name=="iron") {
+    return cap*automationResourceCap;
+  }
+  if(resource.name=="science"||resource.name=="faith") {
+    return cap*scienceResourceCap;
+  }
+  return cap*resourceCap;
+}
+
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
@@ -519,12 +543,14 @@ function getBuildingResearchButtons() {
 }
 
 function getResourceQuantityAndMax () {
-  resourceQuantity = getValues(gamePage.resPool.resources,'value');
-  resourceQuantity=numeric.max(resourceQuantity,0);
+  var resList = gamePage.resPool.resources;
+  resourceQuantity = getValues(resList,'value');
+  resourceQuantity = numeric.max(resourceQuantity,0);
 
-  resourceMax = getValues(gamePage.resPool.resources,'maxValue');
-  for(var i in resourceMax){if (resourceMax[i]==0){resourceMax[i]=Infinity;}}
-  resourceMax = numeric.mul(resourceFraction,resourceMax);
+  resourceMax = zeros(resourceQuantity.length);
+  for (var i in resourceMax) {
+    resourceMax[i]=getResourceMax(resList[i]);
+  }
 }
 
 
@@ -558,6 +584,12 @@ function getLPParameters (game) {
 
   resourceNullRate = getNullProductionRate(); // important that we run this before buildingrates
   getResourceQuantityAndMax();
+
+  resourceWeightList = [];
+  var resourceList = gamePage.resPool.resources;
+  for (var i in resourceList) {
+    resourceWeightList.push(resourceWeights[resourceList[i].name]);
+  }
 
   var tradesOut = getTradeRates();
   tradeButtons = tradesOut[0];
@@ -909,7 +941,7 @@ function linearProgram (time) {
   // on buildings.
   var resObjective;
   if (scoreAccumulatedResources) {
-    resObjective = numeric.div(-1.0,resourceGlobalMaxes);
+    resObjective = numeric.mul(-1.0,numeric.div(resourceWeightList,resourceGlobalMaxes));
   } else {
     resObjective = zeros(numResources);
   }
@@ -1061,7 +1093,7 @@ function planLoop () {
   if (!linearKittensOn) {return;}
 
   // pause if we need to
-  var priorIsPaused;
+  var priorIsPaused=false;
   if (pauseDuringCalculations) {
     priorIsPaused = gamePage.isPaused;
     if (!gamePage.isPaused) {gamePage.togglePause();}

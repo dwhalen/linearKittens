@@ -7,10 +7,35 @@ linearKittens needs to be loaded into the javascript console, which can be done 
 
 document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/linearKittens.js';
 
-Once linearKittens has been loaded, it can be started and stopped by running respectively
+Wait a couple of seconds.  Once linearKittens has been loaded, it can be started and stopped by running respectively
 
-startLinearKittens()
-stopLinearKittens()
+startLinearKittens();
+stopLinearKittens();
+
+USING THE AI AS A RESOURCE MANAGEMENT SCRIPT
+
+linearKittens can also be made less active.  Its capacity to build can be disabled, and the script can be made to just optimize production and keep resources from hitting the cap.  To set up linearKittens like this, do the following.  Load the AI by running
+
+document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/linearKittens.js';
+
+Wait a couple of seconds.  Once linearKittens has been loaded, change the following settings by running these commands:
+
+performUncappedTrades = false;
+autoBuy = false;
+scoreAccumulatedResources = true;
+resourceCap = 0.9;
+
+Once you change these settings, linearKittens can be started and stopped by running respectively
+
+startLinearKittens();
+stopLinearKittens();
+
+If linearKittens is not planning for the resources you want, you can prioritize certain resources be modifying the resourceWeight object, like
+
+resourceWeights['steel']=100;
+console.log(resourceWeights);
+
+This will also show you the resourceWeight object, which has the internal names for all of the resources.  Certain resources will not be crafted regardless.  If you prioritize scaffolds, for example, linearKittens will gather beams, but not convert them.
 
 GUARANTEES
 
