@@ -891,10 +891,10 @@ function linearProgram (time) {
 
   // can't store more resources than our max
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    if (resourceMax[resNumber]<Infinity) {
+    if (resourceMax[resNumber]/resourceGlobalMaxes[resNumber]<Infinity) {
 
       // check if faith
-      if (ignoreFaithCap && gamePage.resPool.resources[resNumber].name=='fath') {continue;}
+      if (ignoreFaithCap && gamePage.resPool.resources[resNumber].name=='faith') {continue;}
 
       rhs.push(resourceMax[resNumber]);
       matrixOfInequalities.push([].concat(
@@ -909,7 +909,7 @@ function linearProgram (time) {
 
   // need at least epsilon of each resource
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-5*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
+    rhs.push(1e-5-reserveResources[resNumber]/resourceGlobalMaxes[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
@@ -931,14 +931,14 @@ function linearProgram (time) {
 
     // filter which resources we include: some of them don't work.
     if (resourceQuantity[i]<=0 && resourceNullRate[i]<0){
-      rhs.push(1e-5*resourceGlobalMaxes[i]);
+      rhs.push(1e-5);
     } else {
-      rhs.push(resourceQuantity[i]+resourceNullRate[i]*time*ticksPerSecond+1e-5*resourceGlobalMaxes[i]);
+      rhs.push(resourceQuantity[i]/resourceGlobalMaxes[i]+resourceNullRate[i]*time*ticksPerSecond/resourceGlobalMaxes[i]+1e-5);
     }
     matrixOfInequalities.push([].concat(
-      numeric.mul(tradeT[i],-1),
-      numeric.mul(jobT[i],-1*time*ticksPerSecond),
-      numeric.mul(bldT[i],-1*time*ticksPerSecond),
+      numeric.mul(numeric.div(tradeT[i],resourceGlobalMaxes[i]),-1),
+      numeric.mul(numeric.div(jobT[i],resourceGlobalMaxes[i]),-1*time*ticksPerSecond),
+      numeric.mul(numeric.div(bldT[i],resourceGlobalMaxes[i]),-1*time*ticksPerSecond),
       unitVectorVal(numResources,i,1),
       zeros(numButtons)
     ));
@@ -946,13 +946,13 @@ function linearProgram (time) {
 
   // resources must be distributed to buildings
   for(var resNumber = 0;resNumber<numResources;resNumber++) {
-    rhs.push(1e-5*resourceGlobalMaxes[resNumber]-reserveResources[resNumber]);
+    rhs.push(1e-5-reserveResources[resNumber]/resourceGlobalMaxes[resNumber]);
     matrixOfInequalities.push([].concat(
         zeros(numTrades),
         zeros(numJobs),
         zeros(numBlds),
         unitVectorVal(numResources,resNumber,-1),
-        buttonT[resNumber]
+        numeric.div(buttonT[resNumber],resourceGlobalMaxes[resNumber])
     ));
   }
 
@@ -960,7 +960,7 @@ function linearProgram (time) {
   // on buildings.
   var resObjective;
   if (scoreAccumulatedResources) {
-    resObjective = numeric.mul(-1.0,numeric.div(resourceWeightList,resourceGlobalMaxes));
+    resObjective = numeric.mul(-1.0,resourceWeightList);
   } else {
     resObjective = zeros(numResources);
   }
@@ -1010,7 +1010,7 @@ function linearProgram (time) {
   allowedButtons = [];
   allowedButtonCosts = [];
   for (var i in buildableButtonList) {
-    if (buttonCompleteness[i]>=1) {
+    if (buttonCompleteness[i]>=1.0) {
       allowedButtons.push(buildableButtonList[i]);
       allowedButtonCosts.push(buttonCosts[i]);
     }
@@ -1337,18 +1337,26 @@ function autoPrayFunction() {  //heavily modified autopray
   // exit if we haven't unlocked the relgion tab yet
   if (!gamePage.religionTab.visible) {return;}
 
-  faith = gamePage.resPool.get('faith');
-
   // no spending faith if we're saving up for it.
-  if (autoBuy) { // we shouldn't save faith if we're not planning on buying the buildings anyway.
-    if ("testCosts" in window) {
-      for(var i in testCosts) {
-        if (testCosts[i].name == "faith") {return;}
+  if (autoBuy) {
+    if ('buildableButtonList' in window) {
+      for (var i in buildableButtonList) {
+        console.log(buildableButtonList[i].name,buttonCompleteness[i]);
+        if (buttonCompleteness[i]>0.01) {// maybe we should be less conservative than this?
+          // this is a building we are going to make
+          var listOfCosts=buildableButtonList[i].getPrices();
+          console.log(listOfCosts);
+          for (var j in listOfCosts) {
+            console.log(listOfCosts[j].name);
+            if (listOfCosts[j].name=='faith') {return;}
+          }
+        }
       }
     }
   }
 
-  if (faith.value > 0.90*faith.maxValue) {
+  faith = gamePage.resPool.get('faith');
+  if (faith.value > 0.9*faith.maxValue) {
     gamePage.religionTab.praiseBtn.onClick();
   }
 }
@@ -1364,8 +1372,8 @@ function startLinearKittens() {
 
   linearKittensOn = true;
   autoCatnip = setInterval(autoCatnipFunction,2000);
-  starClick = setInterval(starClickFunction, 1 * 1000);
-  autoPray = setInterval(autoPrayFunction,10*1000);
+  starClick = setInterval(starClickFunction, 1*1000);
+  autoPray = setInterval(autoPrayFunction,1*1000);
 
   respawnCopy();
   planLoop();
