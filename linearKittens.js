@@ -1,10 +1,7 @@
 // Uses owl-deepcopy: http://oranlooney.com/static/javascript/deepCopy.js
 // and Numeric Javascript: http://numericjs.com/numeric/index.php
-// and UNDERSCORE.js: http://underscorejs.org/
 document.body.appendChild(document.createElement('script')).src='http://oranlooney.com/static/javascript/deepCopy.js';
 document.body.appendChild(document.createElement('script')).src='http://numericjs.com/numeric/lib/numeric-1.2.6.js';
-document.body.appendChild(document.createElement('script')).src='http://underscorejs.org/underscore.js';
-
 
 // Number of ticks every second
 ticksPerSecond = gamePage.rate; //5
@@ -37,9 +34,6 @@ catnipReserve=0.05;
 planningInterval = 60;
 executionInterval = 5;
 
-// A click event to pass to onClick functions
-genericEvent = {shiftKey:false};
-
 /* Determine whether linearKittens pauses the game while it executes the planning loop.
 This could be useful on slower computers or if gamePage.rate is large.  Leaving it on
 will cause a 10-30% slow-down in game speed.  This can be modified after loading the
@@ -59,7 +53,9 @@ performUncappedTrades=true;
 
 /* This adds additional utility in the LP for simply gathering additional resources.
 The bonus provided is some fraction of the resource maximum which is multiplied by the
-corresponding resourceWeight. */
+corresponding resourceWeight.
+Increasing the weight of the faith resource will also tell linearKittens to ignore
+the faith cap during calculations as long as scoreAccumulatedResources is true.*/
 scoreAccumulatedResources = false;
 resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights[gamePage.resPool.resources[i].name]=1;}
 
@@ -69,6 +65,8 @@ resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights
 // faith generation.
 ignoreFaithCap = false;
 
+// A click event to pass to onClick functions
+genericEvent = {shiftKey:false};
 
 
 
@@ -91,12 +89,31 @@ function getResourceMax(resource) {
   if(resource.name=="wood"||resource.name=="minerals"||resource.name=="iron") {
     return cap*automationResourceCap;
   }
+  if(resource.name=='faith'&&scoreAccumulatedResources&&resourceWeights['faith']>1) {
+      return Infinity; // special dispensation to allow the AI to agressively pursue faith.
+  }
   if(resource.name=="science"||resource.name=="faith") {
     return cap*scienceResourceCap;
   }
   return cap*resourceCap;
 }
 
+//indexOf will return the index of content in object.  Only works for arrays.
+function indexOf (object,content) {
+  for (var i=0;i<object.length;i++) {
+    if (object[i]==content) {return i;}
+  }
+  return null;
+}
+
+//range
+function range (n) {
+  var out = [];
+  for(var i=1;i<=n;i++) {
+    out.push(i);
+  }
+  return out;
+}
 
 // Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
 // so we should use this sparingly.
@@ -194,11 +211,13 @@ function getTradeRates () {
   // Go through each of the actual trade rates, get the trade values, and
   // store the actual button for gamePage in buttonlist
 
-  //space
+  //rockets
+  /*
   if (gamePage.spaceTab.visible && gamePage.spaceTab.buildRocketBtn.visible) {
     buttonlist.push(gamePage.spaceTab.buildRocketBtn);
     returns.push(getSingleTradeRate(gameCopy.spaceTab.buildRocketBtn,true));
   }
+  */
 
   //hunt
   if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn) {
@@ -442,7 +461,7 @@ function getKittenRates () {
   return [joblist,returns];
 }
 
-function zeros (n) {return numeric.mul(_.range(n),0);}
+function zeros (n) {return numeric.mul(range(n),0);}
 function unitVector (n,m) {
   var array = zeros(n);
   array[m]=1;
@@ -460,7 +479,7 @@ function costToVector(costs) {
     var name = costs[i].name;
     var val = costs[i].val;
 
-    var index = _.indexOf(resourceNames, name);
+    var index = indexOf(resourceNames, name);
     out[index]+=val;
   }
   return out;
@@ -727,7 +746,7 @@ numRes                              -I            <=epsilon-resourceReserve
 numRes    -rates    -jobs*T -blds*T I             <=epsilon+resStart+nullRate*T
 numRes                              -I    costs   <=epsilon
 
-objective:                                -1...-1
+objective:                                -bweights
 
 
 In order to make the linear program happier, we may want to rescale some of the rows and
@@ -1004,6 +1023,12 @@ function linearProgram (time) {
     }
   }
 
+  console.log("  Buildings used:");
+  for(var i in bldsToDo) {
+    if(bldsToDo[i]>1.0e-4) {
+      console.log("   ",bldList[i].label,":",Math.round(100*bldsToDo[i]), "%");
+    }
+  }
 
   //console.log("tradesToDo",tradesToDo);
   console.log("  Job distribution:");
@@ -1099,8 +1124,7 @@ function planLoop () {
     if (!gamePage.isPaused) {gamePage.togglePause();}
   }
 
-
-  console.log ("PLANNING LOOP");
+  console.log ("\nPLANNING LOOP");
   planningloopseason = gamePage.calendar.season;
   planningloopweather = gamePage.calendar.weather;
 
@@ -1151,7 +1175,7 @@ loop3Counter = 0;
 function executeLoop () {
   if (!linearKittensOn) {return;}
 
-  console.log ("EXECUTION LOOP");
+  console.log ("\nEXECUTION LOOP");
   console.log("  Remaining trades:");
   loop3Counter = (loop3Counter+1)%10;
   printTrades();
@@ -1187,7 +1211,7 @@ function executeLoop () {
             // hunts need to be treated differently, for some reason.
             if (button.name=="Send hunters") {
               button.payPrice();
-              gamePage.villageTab.sendHunterSquad()
+              gamePage.villageTab.sendHunterSquad();
             } else {
               if (button.handler) {button.handler(button);} else {button.onClick(genericEvent);}
             }
@@ -1277,8 +1301,8 @@ function executeLoop () {
     for (i in allowedButtons) {
       var buildButton = allowedButtons[i];
       buttonPrices=buildButton.getPrices();
-      var canBuild = numPurchasable(buttonPrices);
-      if (canBuild>0) {
+      var canBuildNow = numPurchasable(buttonPrices);
+      if (canBuildNow>0) {
         console.log("  Constructing",buildButton.name);
         buildButton.onClick(genericEvent);
         if (linearKittensOn) {setTimeout(planLoop,1);}
