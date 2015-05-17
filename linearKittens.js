@@ -68,6 +68,9 @@ ignoreFaithCap = false;
 // A click event to pass to onClick functions
 genericEvent = {shiftKey:false};
 
+// a randomly added quantity to the building weights
+randomBuildingWeightScaling = 0.01;
+
 
 
 // The weights for the buildables, used to prioritize certain buildings or research
@@ -328,87 +331,105 @@ function getNullProductionRate () {
 }
 
 
+// finds a list of all buildables
+function getObjects(game) {
+  var objects =  [].concat(
+    game.bld.meta[0].meta,
+    game.science.techs,
+    game.workshop.meta[0].meta,
+    game.religion.meta[0].meta,
+    game.religion.meta[1].meta,
+    game.space.programs
+  );
+  for (var planetIndex in game.space.planets) {
+    if (game.space.planets[planetIndex].buildings) {
+      objects = objects.concat(game.space.planets[planetIndex].buildings);
+    }
+  }
+  return objects;
+}
+
+function getActivatableButtons() {
+  // compile a list of visible buttons
+  refreshTabs();
+  var buttonList = [];
+  for (var pi in gamePage.tabs) {
+    var tab = gamePage.tabs[pi];
+    if (tab.visible) {
+
+      // generic tabs: bonfire, workshop, science
+      for(var bi in tab.buttons) {
+        var button = tab.buttons[bi];
+        if (button.visible) {
+          buttonList.push(button);
+        }
+      }
+
+      // religion: Order of Light
+      if (tab.rUpgradeButtons) {
+        for(var bi in tab.rUpgradeButtons) {
+          var button = tab.rUpgradeButtons[bi];
+          if (button.visible) {
+            buttonList.push(button);
+          }
+        }
+      }
+
+      // religion: Ziggurats
+      if (tab.zgUpgradeButtons) {
+        for(var bi in tab.zgUpgradeButtons) {
+          var button = tab.zgUpgradeButtons[bi];
+          if (button.visible) {
+            buttonList.push(button);
+          }
+        }
+      }
+
+      // space: Ground Control
+      if (tab.GCPanel) {
+        tab.GCPanel.update(); // no idea why the fuck we need this
+        for(var bi in tab.GCPanel.children) {
+          var button = tab.GCPanel.children[bi];
+          if (button.visible) {
+            buttonList.push(button);
+          }
+        }
+      }
+
+      // space;:Planet Panels
+      if(tab.planetPanels) {
+        for (var panelNumber in tab.planetPanels) {
+          for(var bi in tab.planetPanels[panelNumber].children) {
+            var button = tab.planetPanels[panelNumber].children[bi];
+            if (button.visible) {
+              buttonList.push(button);
+            }
+          }
+        }
+      }
+
+      //that should be everything (I hope)
+    }
+  }
+  return buttonList;
+}
+
 // return the various rates for buildings.  Only include if there is at least
 // one of the corresponding building, regardless of unlockness
 function getTogglableBuildings () {
   var bldlist = []; // a stored list of buildings, in case things change suddenly
   var copybldlist = [];
-  //gamePage.bld.meta[0].meta or gamePage.bld.get(name)
-  //gamePage.science.techs,
-  //gamePage.workshop.meta[0].meta or gamePage.workshop.getCraft(name),
-  //gamePage.religion.meta[0].meta,
-  //gamePage.religion.meta[1].meta,
-  //gamePage.space.programs
 
-  //space
-  array = gamePage.space.programs;
-  arraycopy = gameCopy.space.programs;
-  if (gamePage.spaceTab.visible) {
-    for (var i=0;i<array.length;i++) {
-      if (array[i].val>0 && (array[i].togglable||array[i].tunable)) {
-        bldlist.push(array[i]);
-        copybldlist.push(arraycopy[i]);
-      }
-    }
-  }
+  var bldSource = getObjects(gamePage);
+  var copybldSource = getObjects(gameCopy);
 
-  //science
-  array = gamePage.science.techs;
-  arraycopy = gameCopy.science.techs;
-  if (gamePage.libraryTab.visible) {
-    for (var i=0;i<array.length;i++) {
-      if (array[i].val>0 && (array[i].togglable||array[i].tunable)) {
-        bldlist.push(array[i]);
-        copybldlist.push(arraycopy[i]);
-      }
-    }
-  }
+  for (i in bldSource) {
+    bld = bldSource[i];
+    copybld = copybldSource[i];
 
-  //workshop
-  meta = gamePage.workshop.meta;
-  metacopy = gameCopy.workshop.meta;
-  for (var j = 0;j<meta.length;j++) {
-    array = meta[j].meta;
-    arraycopy = metacopy[j].meta;
-    if (gamePage.workshopTab.visible) {
-      for (var i=0;i<array.length;i++) {
-        if (array[i].val>0 && (array[i].togglable||array[i].tunable)) {
-          bldlist.push(array[i]);
-          copybldlist.push(arraycopy[i]);
-        }
-      }
-    }
-  }
-
-  //religion
-  meta = gamePage.religion.meta;
-  metacopy = gameCopy.religion.meta;
-  for (var j = 0;j<meta.length;j++) {
-    array = meta[j].meta;
-    arraycopy = metacopy[j].meta;
-    if (gamePage.religionTab.visible) {
-      for (var i=0;i<array.length;i++) {
-        if (array[i].val>0 && (array[i].togglable||array[i].tunable)) {
-          bldlist.push(array[i]);
-          copybldlist.push(arraycopy[i]);
-        }
-      }
-    }
-  }
-
-  //buildings
-  meta = gamePage.bld.meta;
-  metacopy = gameCopy.bld.meta;
-  for (var j = 0;j<meta.length;j++) {
-    array = meta[j].meta;
-    arraycopy = metacopy[j].meta;
-    if (gamePage.libraryTab.visible) {
-      for (var i=0;i<array.length;i++) {
-        if (array[i].val>0 && (array[i].togglable||array[i].tunable)) {
-          bldlist.push(array[i]);
-          copybldlist.push(arraycopy[i]);
-        }
-      }
+    if(bld.val>0 && (bld.togglable||bld.tunable)){
+      bldlist.push(bld);
+      copybldlist.push(copybld);
     }
   }
 
@@ -486,54 +507,12 @@ function costToVector(costs) {
 }
 
 function getBuildingResearchButtons() {
-  // compile a list of visible buttons
-  refreshTabs();
-  var buttonList = [];
-  for (var pi in gamePage.tabs) {
-    var tab = gamePage.tabs[pi];
-    if (tab.visible) {
-      for(var bi in tab.buttons) {
-        var button = tab.buttons[bi];
-        if (button.visible) {
-          buttonList.push(button);
-        }
-      }
-      if (tab.rUpgradeButtons) {
-        for(var bi in tab.rUpgradeButtons) {
-          var button = tab.rUpgradeButtons[bi];
-          if (button.visible) {
-            buttonList.push(button);
-          }
-        }
-      }
-      if (tab.zgUpgradeButtons) {
-        for(var bi in tab.zgUpgradeButtons) {
-          var button = tab.zgUpgradeButtons[bi];
-          if (button.visible) {
-            buttonList.push(button);
-          }
-        }
-      }
-      if (tab.GCPanel) {
-        tab.GCPanel.update(); // no idea why the fuck we need this
-        for(var bi in tab.GCPanel.children) {
-          var button = tab.GCPanel.children[bi];
-          if (button.visible) {
-            buttonList.push(button);
-          }
-        }
-      }
-    }
-  }
+  // Now construct objects, which contains all of the building objects
+  // We're going to cross-reference with the buttons to determine what
+  // can be built.
 
-  objects =  [].concat(
-    gamePage.bld.meta[0].meta,
-    gamePage.science.techs,
-    gamePage.workshop.meta[0].meta,
-    gamePage.religion.meta[0].meta,
-    gamePage.religion.meta[1].meta,
-    gamePage.space.programs
-  );
+  var buttonList=getActivatableButtons();
+  objects =  getObjects(gamePage);
 
   availablebuttons = [];
 
@@ -747,6 +726,7 @@ numRes    -rates    -jobs*T -blds*T I             <=epsilon+resStart+nullRate*T
 numRes                              -I    costs   <=epsilon
 
 objective:                                -bweights
+or objective:                       -1/maxres -bweights
 
 
 In order to make the linear program happier, we may want to rescale some of the rows and
@@ -794,7 +774,9 @@ function linearProgram (time) {
   //evaluate the weights for all the buttons
   buttonWeights = [];
   for (i in buildableButtonList) {
-    buttonWeights.push(buildableWeight(buildableButtonList[i]));
+    var weight = buildableWeight(buildableButtonList[i]);
+    weight*= 1 + randomBuildingWeightScaling* Math.random();
+    buttonWeights.push(weight);
   }
 
   //List the buttons that we're considering
@@ -1117,6 +1099,8 @@ function planLoop () {
   clearTimeout(planLoopTimeout);planLoopTimeout=false;
   if (!linearKittensOn) {return;}
 
+  var startTime = new Date().getTime();
+
   // pause if we need to
   var priorIsPaused=false;
   if (pauseDuringCalculations) {
@@ -1137,6 +1121,8 @@ function planLoop () {
 
   out = linearProgram(planningInterval);
 
+  var endTime = new Date().getTime();
+  console.log('  Planning loop completed in ' +(endTime-startTime)+'ms');
 
   if (linearKittensOn) {planLoopTimeout=setTimeout(planLoop, planningInterval*1000);}
   // unpause if we need to
@@ -1341,13 +1327,10 @@ function autoPrayFunction() {  //heavily modified autopray
   if (autoBuy) {
     if ('buildableButtonList' in window) {
       for (var i in buildableButtonList) {
-        console.log(buildableButtonList[i].name,buttonCompleteness[i]);
-        if (buttonCompleteness[i]>0.01) {// maybe we should be less conservative than this?
+        if (buttonCompleteness[i]>0.9) {// maybe we should be less conservative than this?
           // this is a building we are going to make
           var listOfCosts=buildableButtonList[i].getPrices();
-          console.log(listOfCosts);
           for (var j in listOfCosts) {
-            console.log(listOfCosts[j].name);
             if (listOfCosts[j].name=='faith') {return;}
           }
         }
@@ -1368,7 +1351,7 @@ autoCatnip=false;
 executeInterval = false;
 planLoopTimeout=false;
 function startLinearKittens() {
-  if (linearKittensOn) {console.log("linearKittens already started."); return;}
+  if (linearKittensOn) {console.error("linearKittens already started."); return;}
 
   linearKittensOn = true;
   autoCatnip = setInterval(autoCatnipFunction,2000);
