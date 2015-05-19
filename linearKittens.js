@@ -969,6 +969,7 @@ function linearProgram (time) {
   if(solution.message=="Infeasible") {
     console.log("no solution to the linear program found: defaulting to farming.");
     tradesToDo=zeros(numTrades);
+    realTradesToDo=zeros(numTrades);
     jobsToDo=zeros(numJobs);
     bldsToDo=zeros(numBlds);
     expectedResources=zeros(numResources);
