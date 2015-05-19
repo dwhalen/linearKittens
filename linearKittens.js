@@ -71,7 +71,15 @@ genericEvent = {shiftKey:false};
 // a randomly added quantity to the building weights
 randomBuildingWeightScaling = 0.01;
 
+// This determines whether building a building will stop execution and cause the planning loop to rerun.
+// if allowedRepeatedBuilds is true, this will enable the exectution loop to buy multiple of the same
+// building during each planning loop.
+constructionResetsPlanning = true;
+allowRepeatedBuilds = true;
 
+// Scales the trade quantities to keep them within the dynamic range of the linear programming solver.
+// Acts like the researchGlobalMax, but the trade range varies less, so we can be less careful.
+tradeScaling = 1000;
 
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
@@ -79,7 +87,7 @@ randomBuildingWeightScaling = 0.01;
 function buildableWeight(button) {
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
-  if ('transcendence' in button) {return 10;}
+  if ('transcendence' in button) {return 10;}//Order of Light objects
   return 1;
 }
 
@@ -207,20 +215,13 @@ function getAverageHuntRate (amt) { //because fuck binding
 
 // compile all the trade-like buttons
 // You should probably refreshTabs before this.
+// Leviathans have a feed button that needs to be implemented
 function getTradeRates () {
   var buttonlist = []; // a stored list of buttons, in case things change suddenly
   var returns = [];
 
   // Go through each of the actual trade rates, get the trade values, and
   // store the actual button for gamePage in buttonlist
-
-  //rockets
-  /*
-  if (gamePage.spaceTab.visible && gamePage.spaceTab.buildRocketBtn.visible) {
-    buttonlist.push(gamePage.spaceTab.buildRocketBtn);
-    returns.push(getSingleTradeRate(gameCopy.spaceTab.buildRocketBtn,true));
-  }
-  */
 
   //hunt
   if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn) {
@@ -575,6 +576,13 @@ function updateResourceGlobalMaxes(){
   }
 }
 
+tradeGlobalMaxes=false;
+function updateTradeGlobalMaxes() {
+  if (tradeGlobalMaxes===false) {
+
+  }
+}
+
 
 function getLPParameters (game) {
   maxKittens = game.village.maxKittens;
@@ -918,7 +926,7 @@ function linearProgram (time) {
       rhs.push(resourceQuantity[i]/resourceGlobalMaxes[i]+resourceNullRate[i]*time*ticksPerSecond/resourceGlobalMaxes[i]+1e-5);
     }
     matrixOfInequalities.push([].concat(
-      numeric.mul(numeric.div(tradeT[i],resourceGlobalMaxes[i]),-1),
+      numeric.mul(numeric.div(tradeT[i],resourceGlobalMaxes[i]),-1.0*tradeScaling),
       numeric.mul(numeric.div(jobT[i],resourceGlobalMaxes[i]),-1*time*ticksPerSecond),
       numeric.mul(numeric.div(bldT[i],resourceGlobalMaxes[i]),-1*time*ticksPerSecond),
       unitVectorVal(numResources,i,1),
@@ -976,6 +984,7 @@ function linearProgram (time) {
     // turn the solution into actual useful quantities
     ci = 0;
     realTradesToDo = solution.solution.slice(ci,ci + numTrades); ci+=numTrades;
+    realTradesToDo = numeric.mul(realTradesToDo,tradeScaling);
     tradesToDo = numeric.ceil(numeric.sub(realTradesToDo,tradeThreshold)); // Integerize
     jobsToDo = solution.solution.slice(ci,ci + numJobs); ci+=numJobs;
     bldsToDo = solution.solution.slice(ci,ci + numBlds); ci+=numBlds;
@@ -998,6 +1007,8 @@ function linearProgram (time) {
     }
   }
 
+
+  // Now print the results
   console.log("  Planned constructions:");
   for (var i in buttonCompleteness) {
     if (buttonCompleteness[i]>0.001) {
@@ -1008,7 +1019,7 @@ function linearProgram (time) {
   console.log("  Buildings used:");
   for(var i in bldsToDo) {
     if(bldsToDo[i]>1.0e-4) {
-      console.log("   ",bldList[i].label,":",Math.round(100*bldsToDo[i]), "%");
+      console.log("   ",bldList[i].label||bldList[i].title,":",Math.round(100*bldsToDo[i]), "%");
     }
   }
 
@@ -1188,6 +1199,9 @@ function executeLoop () {
           //console.log("crafting resources.");
           gamePage.craft(button.craftName,canBuild);
         } else if (button.race) {
+          // continue if Leviathans and duration is not positive, because this button can disappear
+          if ('duration' in button.race && button.race.duration<=0) {continue;}
+
           //console.log("trading multiple");
           button.tradeMultiple(canBuild);
         } else {
@@ -1283,19 +1297,29 @@ function executeLoop () {
     }
   }
   // Check whether we can build any of the the buildings
+  currentlyAllowedButtons = allowedButtons;
+  allowedButtons=[];
   if (autoBuy) { // if autoBuy is off, we can ignore this entire step.
-    for (i in allowedButtons) {
-      var buildButton = allowedButtons[i];
+    for (i in currentlyAllowedButtons) {
+      var buildButton = currentlyAllowedButtons[i];
       buttonPrices=buildButton.getPrices();
       var canBuildNow = numPurchasable(buttonPrices);
       if (canBuildNow>0) {
+        // try to build it.
         console.log("  Constructing",buildButton.name);
         buildButton.onClick(genericEvent);
-        if (linearKittensOn) {setTimeout(planLoop,1);}
-        return;
+        if (constructionResetsPlanning) {
+          if (linearKittensOn) {setTimeout(planLoop,1);}
+          return;
+        }
+      } else {
+        //can't build it
+        allowedButtons.push(buildButton);
       }
     }
   }
+  if (allowRepeatedBuilds) {allowedButtons=currentlyAllowedButtons;}
+
 
   //If we changed season, we should run loop2 again.
   if(planningloopseason != gamePage.calendar.season||planningloopweather!=gamePage.calendar.weather) {
