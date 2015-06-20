@@ -1250,10 +1250,16 @@ function executeLoop () {
     return;
   }
 
-  //Override if below the catnip reserve.  Ignore the other reserves for now.
+  //Override if below the catnip reserve, we have at least five kittens and access to farmers.
+  //Ignore the other reserves for now.
   //Every kitten should forget his job, so they all get treated as unaccounted kittens.
   var catnipRes = gamePage.resPool.get('catnip');
-  if(catnipRes.value<catnipReserve*catnipRes.maxValue) {
+  if(
+    catnipRes.value<catnipReserve*catnipRes.maxValue &&
+    gamePage.village.maxKittens>=5 &&
+    gamePage.science.get("agriculture").researched
+    ) {
+    console.log("  Below catnip reserve: assigning kittens to farming.");
     toJobs = numeric.mul(0,toJobs);
     expectedKittens=0;
     totalJobs=0;
@@ -1262,13 +1268,15 @@ function executeLoop () {
   // randomly assign the last expected kittens
   var randomKittens = expectedKittens-totalJobs;
   deltaJobs = numeric.sub(jobsToDo,toJobs);
+  //console.log("jobs:",jobsToDo,deltaJobs, toJobs);
+
   for (i=0;i<randomKittens;i++) {
     var randomJob = randomInteger(deltaJobs);
     toJobs[i]+=1;
   }
 
   var extraKittens = numKittens-expectedKittens;
-
+  
   // remove kittens from jobs
   for ( i in toJobs) {
     idealJobs = toJobs[i];
@@ -1287,15 +1295,24 @@ function executeLoop () {
       getJobButton(job).update();
     }
   }
-  // any remaining kittens become farmers
+  // any remaining kittens become farmers if available and something else otherwise
+  var foundFarmers=false;
   if (extraKittens>0) {
     for (i in toJobs) {
       job = jobList[i];
       if (job.name=="farmer") {
+        foundFarmers=true;
         getJobButton(job).assignJobs(extraKittens);
         getJobButton(job).update();
+        break;
       }
     }
+    if (!foundFarmers) {
+      job = jobList[0];
+      getJobButton(job).assignJobs(extraKittens);
+      getJobButton(job).update();
+    }
+
   }
   // Check whether we can build any of the the buildings
   currentlyAllowedButtons = allowedButtons;
