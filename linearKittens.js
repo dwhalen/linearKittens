@@ -85,7 +85,7 @@ tradeScaling = 1000;
 // The most consistant way to handle this is probably to calculate them when we read
 // in the corresponding objects, but this will work for the moment..
 // I've also hardcoded in a restriction regarding the timing of building
-// huts in the early game and researching agriculture
+// huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
   if(button.name=="Hut"  && button.getBuilding().val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
@@ -1251,7 +1251,8 @@ function executeLoop () {
   var totalJobs = listSum(toJobs);
   if (totalJobs>numKittens) { //game.village.getKittens();
     console.error("  Too few kittens for assigned jobs.");
-    return;
+    toJobs=numeric.mul(0,toJobs);
+    expectedKittens=0;
   }
 
   //Override if below the catnip reserve, we have at least five kittens and access to farmers.
@@ -1307,17 +1308,25 @@ function executeLoop () {
       if (job.name=="farmer") {
         foundFarmers=true;
         getJobButton(job).assignJobs(extraKittens);
+        toJobs[i]+=extraKittens;
         getJobButton(job).update();
         break;
       }
     }
     if (!foundFarmers) {
       job = jobList[0];
+      toJobs[0]+=extraKittens;
       getJobButton(job).assignJobs(extraKittens);
       getJobButton(job).update();
     }
 
   }
+  //Print the list of assigned jobs
+  console.log("  Jobs assigned:");
+  for (var i in jobsToDo) {
+    if(toJobs[i]>0) {console.log("   ",jobList[i].title,":",toJobs[i]);}
+  }
+
   // Check whether we can build any of the the buildings
   currentlyAllowedButtons = allowedButtons;
   allowedButtons=[];
