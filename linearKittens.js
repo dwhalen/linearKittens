@@ -84,7 +84,11 @@ tradeScaling = 1000;
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
 // in the corresponding objects, but this will work for the moment..
+// I've also hardcoded in a restriction regarding the timing of building
+// huts in the early game and researching agriculture
 function buildableWeight(button) {
+  if(button.name=="Hut"  && button.getBuilding().val>0 && !gamePage.science.get("agriculture").researched)
+    {return 0;}
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}//Order of Light objects
@@ -1276,7 +1280,7 @@ function executeLoop () {
   }
 
   var extraKittens = numKittens-expectedKittens;
-  
+
   // remove kittens from jobs
   for ( i in toJobs) {
     idealJobs = toJobs[i];
