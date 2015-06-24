@@ -12,7 +12,7 @@ automationResourceCap, which applies to wood, minerals, and iron, scienceResourc
 which applies to science and faith, and resourceCap, which applies to all other
 resources. */
 automationResourceCap = 0.9;
-scienceResourceCap = 1.0;
+scienceResourceCap = 0.999;
 resourceCap = 0.99;
 
 // Threshold for ignoring things in the linear programs
@@ -69,7 +69,7 @@ ignoreFaithCap = false;
 genericEvent = {shiftKey:false};
 
 // a randomly added quantity to the building weights
-randomBuildingWeightScaling = 0.01;
+randomBuildingWeightScaling = 0.2;
 
 // This determines whether building a building will stop execution and cause the planning loop to rerun.
 // if allowedRepeatedBuilds is true, this will enable the exectution loop to buy multiple of the same
@@ -87,6 +87,7 @@ tradeScaling = 1000;
 // I've also hardcoded in a restriction regarding the timing of building
 // huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
+  if(button.name=="Catnip Field") return 5;
   if(button.name=="Hut"  && button.getBuilding().val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
@@ -1277,7 +1278,7 @@ function executeLoop () {
 
   for (i=0;i<randomKittens;i++) {
     var randomJob = randomInteger(deltaJobs);
-    toJobs[i]+=1;
+    toJobs[randomJob]+=1;
   }
 
   var extraKittens = numKittens-expectedKittens;
