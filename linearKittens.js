@@ -88,7 +88,7 @@ tradeScaling = 1000;
 // huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
   if(button.name=="Catnip Field") return 5;
-  if(button.name=="Hut"  && button.getBuilding().val>0 && !gamePage.science.get("agriculture").researched)
+  if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
