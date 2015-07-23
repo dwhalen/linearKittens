@@ -637,6 +637,19 @@ function resourceReserve () {
   return out;
 }
 
+// figures out how many of the indicated trades we can perform before hitting the resource cap for some variable.
+function numPurchasableBeforeCap(returnVector) {
+  var localResourceQuantity = getValues(gamePage.resPool.resources,'value');
+  //use the stored resource max: it shouldn't changes
+
+  var remainingQuotient = numeric.div(numeric.sub(resourceMax,localResourceQuantity),returnVector);
+  var returnMin = Infinity;
+  for (var i in remainingQuotient) {
+    if (0<=remainingQuotient[i]<Infinity) {returnMin = Math.min(remainingQuotient[i],returnMin);}
+  }
+  return returnMin;
+}
+
 function numPurchasable(prices) {
   var costVec = costToVector(prices);
   var localResourceQuantity = getValues(gamePage.resPool.resources,'value');
@@ -1173,6 +1186,32 @@ function printRealTrades() {
   }
 }
 
+// This will perform the specified number of trades, regardless of what the button is.
+function executePerformTrades(button, canBuild) {
+  if (button.craftName) {
+    //console.log("crafting resources.");
+    gamePage.craft(button.craftName,canBuild);
+  } else if (button.race) {
+    // continue if Leviathans and duration is not positive, because this button can disappear
+    if ('duration' in button.race && button.race.duration<=0) {return;}
+
+    //console.log("trading multiple");
+    button.tradeMultiple(canBuild);
+  } else {
+    //try to trade one at a time...
+    //console.log(button.name, canBuild);
+    for (var i=0;i<canBuild;i++) {
+      // hunts need to be treated differently, for some reason.
+      if (button.name=="Send hunters") {
+        button.payPrice();
+        gamePage.villageTab.sendHunterSquad();
+      } else {
+        if (button.handler) {button.handler(button);} else {button.onClick(genericEvent);}
+      }
+    }
+  }
+}
+
 // Do this every second
 loop3Counter = 0;
 function executeLoop () {
@@ -1184,48 +1223,49 @@ function executeLoop () {
   printTrades();
 
   // try to do all the trades.
-  for (var i in tradesToDo) {
-    //console.log(tradesToDo[i]);
-    if (tradesToDo[i]>0) {
+  var canPerformBadTrades = false;
+  var continueTradeLoop = true;
+  var madeTrade = false;
+
+  while (true) {
+    madeTrade = false;
+
+    for (var i in tradesToDo) {
+      //console.log(tradesToDo[i]);
+      if (tradesToDo[i]<=0) {continue;}
+
       // atempt to perform the trade.
       var button = tradeButtons[i];
       var costs = button.getPrices();
       var canBuild = numPurchasable(costs);
+      if (canBuild==0) {continue;}
+
+      var goodBuilds = numPurchasableBeforeCap(tradeReturns[i]); // real value geq 0
+      if (!canPerformBadTrades && goodBuilds <1) {continue;} // there are builds, but not any that won't pass the resource cap.
 
       // at this point, check to see whether performUncappedTrades prevents this trade
-      if (!performUncappedTrades && !usesLimitedResources(costs)) {
-        continue;
-      }
+      if (!performUncappedTrades && !usesLimitedResources(costs)) {continue;}
 
       //console.log(costs,canBuild);
       canBuild = Math.min(canBuild,tradesToDo[i]);
-      tradesToDo[i]-=canBuild;
-      if (canBuild>0) {
-        if (button.craftName) {
-          //console.log("crafting resources.");
-          gamePage.craft(button.craftName,canBuild);
-        } else if (button.race) {
-          // continue if Leviathans and duration is not positive, because this button can disappear
-          if ('duration' in button.race && button.race.duration<=0) {continue;}
-
-          //console.log("trading multiple");
-          button.tradeMultiple(canBuild);
-        } else {
-          //try to trade one at a time...
-          //console.log(button.name, canBuild);
-          for (var i=0;i<canBuild;i++) {
-            // hunts need to be treated differently, for some reason.
-            if (button.name=="Send hunters") {
-              button.payPrice();
-              gamePage.villageTab.sendHunterSquad();
-            } else {
-              if (button.handler) {button.handler(button);} else {button.onClick(genericEvent);}
-            }
-          }
-        }
+      if (!canPerformBadTrades) {
+        canBuild = Math.min(canBuild,Math.floor(goodBuilds));
       }
+      if (canBuild<=0) {continue;}
 
+
+      tradesToDo[i]-=canBuild;
+      executePerformTrades(button,canBuild);
+      madeTrade = true;
+
+      // this is the only bad trade we are allowed to do in this loop
+      if (canPerformBadTrades) {canPerformBadTrades=false; break;}
     }
+
+    // If we can't make any trades, including the bad ones, stop trading.
+    // If we didn't make any good trades, start considering the bad ones.
+    if (!madeTrade && canPerformBadTrades) {break;}
+    if (!madeTrade) {canPerformBadTrades=true;}
   }
 
   // set a bunch of buildings to the appropriate state.  Skip the buttons.
