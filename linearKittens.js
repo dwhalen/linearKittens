@@ -645,7 +645,7 @@ function numPurchasableBeforeCap(returnVector) {
   var remainingQuotient = numeric.div(numeric.sub(resourceMax,localResourceQuantity),returnVector);
   var returnMin = Infinity;
   for (var i in remainingQuotient) {
-    if (0<=remainingQuotient[i]<Infinity) {returnMin = Math.min(remainingQuotient[i],returnMin);}
+    if (0<=remainingQuotient[i]&&remainingQuotient[i]<Infinity) {returnMin = Math.min(remainingQuotient[i],returnMin);}
   }
   return returnMin;
 }
@@ -1193,7 +1193,7 @@ function executePerformTrades(button, canBuild) {
     gamePage.craft(button.craftName,canBuild);
   } else if (button.race) {
     // continue if Leviathans and duration is not positive, because this button can disappear
-    if ('duration' in button.race && button.race.duration<=0) {return;}
+    if ('duration' in button.race && (button.race.duration==0 || button.race.duration<0)) {return 0;}
 
     //console.log("trading multiple");
     button.tradeMultiple(canBuild);
@@ -1210,6 +1210,7 @@ function executePerformTrades(button, canBuild) {
       }
     }
   }
+  return canBuild;
 }
 
 // Do this every second
@@ -1224,10 +1225,10 @@ function executeLoop () {
 
   // try to do all the trades.
   var canPerformBadTrades = false;
-  var continueTradeLoop = true;
   var madeTrade = false;
 
   while (true) {
+    //console.log("starting trade loop.  bad trades:", canPerformBadTrades);
     madeTrade = false;
 
     for (var i in tradesToDo) {
@@ -1251,11 +1252,15 @@ function executeLoop () {
       if (!canPerformBadTrades) {
         canBuild = Math.min(canBuild,Math.floor(goodBuilds));
       }
+      //console.log("performing ", canBuild, " trades of ",goodBuilds, " good trades of ",button.name,button.race);
+
       if (canBuild<=0) {continue;}
 
 
       tradesToDo[i]-=canBuild;
+      //console.log(currenttemp = getValues(gamePage.resPool.resources,'value'));
       executePerformTrades(button,canBuild);
+      //console.log(numeric.sub(getValues(gamePage.resPool.resources,'value'),currenttemp));
       madeTrade = true;
 
       // this is the only bad trade we are allowed to do in this loop
