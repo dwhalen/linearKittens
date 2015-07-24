@@ -81,6 +81,12 @@ allowRepeatedBuilds = true;
 // Acts like the researchGlobalMax, but the trade range varies less, so we can be less careful.
 tradeScaling = 1000;
 
+// If quadraticBuildingsOn, then magnetos, steamworks, observatories and factories will always be set to
+// on.  This may break everything if you have insufficiently many oil wells.
+// Current plan is to disable this if a planning loop fails and then reenable an hour later.
+quadraticBuildingsOn = true;
+quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab"];
+
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
 // in the corresponding objects, but this will work for the moment..
@@ -119,7 +125,7 @@ function indexOf (object,content) {
   for (var i=0;i<object.length;i++) {
     if (object[i]==content) {return i;}
   }
-  return null;
+  return -1;
 }
 
 //range
@@ -325,11 +331,18 @@ function getNullProductionRate () {
   var bldlist = temp[0];
   var copybldlist = temp[1];
 
-  for(i=0;i<copybldlist.length;i++) {
-    bld = copybldlist[i];
+  for(i in copybldlist) {
     // turn them all off
-    bld.on=0;
+    copybldlist[i].on=0;
   }
+
+  // set all the quadratic buildings to the appropriate values
+  for (i in quadraticBuildingList) {
+    var bld = gameCopy.bld.get(quadraticBuildingList[i]);
+    bld.on = bld.val*quadraticBuildingsOn;
+  }
+
+
   recalculateProduction(gameCopy);
   var beforeResources=getValues(gameCopy.resPool.resources,"perTickUI");
 
@@ -432,6 +445,9 @@ function getTogglableBuildings () {
   for (i in bldSource) {
     bld = bldSource[i];
     copybld = copybldSource[i];
+
+    // skip the quadratic buildings
+    if(indexOf(quadraticBuildingList,bld.name)>=0) {continue;}
 
     if(bld.val>0 && (bld.togglable||bld.tunable)){
       bldlist.push(bld);
@@ -998,6 +1014,9 @@ function linearProgram (time) {
       if (jobList[i].name=="farmer") {jobsToDo[i]=numKittens;}
     }
 
+    // It's possible the the quadratic buildings broke things.  In case this is true, disable them for an hour.
+    quadraticBuildingsOn=false;
+    setInterval(function () {quadraticBuildingsOn=true;return;},60*60*1000);
 
   } else {
     // turn the solution into actual useful quantities
@@ -1289,6 +1308,12 @@ function executeLoop () {
     }
   }
 
+  // set the quadratic buildings to the appropriate state
+  for (i in quadraticBuildingList) {
+    var bld = gamePage.bld.get(quadraticBuildingList[i]);
+    bld.on = bld.val*quadraticBuildingsOn;
+  }
+
   // assign kittens to the appropriate jobs
   // do so cleverly, or something, by minimizing number of operations.
   numKittens = gamePage.village.getKittens();
@@ -1462,7 +1487,6 @@ function startLinearKittens() {
   respawnCopy();
   planLoop();
   executeInterval = setInterval(executeLoop,executionInterval*1000);
-
 }
 
 function stopLinearKittens() {
