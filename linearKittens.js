@@ -1131,7 +1131,7 @@ function getExtraButtons() {
 
 
   numShips = gamePage.resPool.get("ship").value;
-  desiredShips = Math.min(Math.max(2*numShips,25),maxTradeShips);
+  desiredShips = Math.min(Math.max(2*numShips,5),maxTradeShips);
   if (numShips<maxTradeShips) {
     bb = {
       name:"Buying some trade ships",
