@@ -27,6 +27,11 @@ infiniteResources = 1e10;
 // The ideal number of trade ships
 maxTradeShips=5000;
 
+// number of new trade ships as fraction of current that should be considered equivalently
+// valuable to a new building.  Set this lower if you want linearKittens to buy more
+// trade ships
+tradeShipMultiplier=0.2;
+
 // The fraction of our max catnip that we will reserve for spontaneous season changes
 catnipReserve=0.05;
 
@@ -85,7 +90,7 @@ tradeScaling = 1000;
 // on.  This may break everything if you have insufficiently many oil wells.
 // Current plan is to disable this if a planning loop fails and then reenable an hour later.
 quadraticBuildingsOn = true;
-quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab"];
+quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab","reactor","moonBase","spaceStation"];
 
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
@@ -96,6 +101,7 @@ function buildableWeight(button) {
   if(button.name=="Catnip Field") return 5;
   if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
+  if(button.name=="Buying some trade ships") return (1+tradeShipMultiplier)/(tradeShipMultiplier); // the difference in value between current trade ships and target trade ships should be 1
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}//Order of Light objects
@@ -337,8 +343,8 @@ function getNullProductionRate () {
   }
 
   // set all the quadratic buildings to the appropriate values
-  for (i in quadraticBuildingList) {
-    var bld = gameCopy.bld.get(quadraticBuildingList[i]);
+  for (i in qBldList) {
+    bld = qBldList[i];
     bld.on = bld.val*quadraticBuildingsOn;
   }
 
@@ -442,12 +448,17 @@ function getTogglableBuildings () {
   var bldSource = getObjects(gamePage);
   var copybldSource = getObjects(gameCopy);
 
+  qBldList = []; //The quadratic buildings
+
   for (i in bldSource) {
     bld = bldSource[i];
     copybld = copybldSource[i];
 
     // skip the quadratic buildings
-    if(indexOf(quadraticBuildingList,bld.name)>=0) {continue;}
+    if(indexOf(quadraticBuildingList,bld.name)>=0) {
+      qBldList.push(bld);
+      continue;
+    }
 
     if(bld.val>0 && (bld.togglable||bld.tunable)){
       bldlist.push(bld);
@@ -1131,7 +1142,7 @@ function getExtraButtons() {
 
 
   numShips = gamePage.resPool.get("ship").value;
-  desiredShips = Math.min(Math.max(2*numShips,5),maxTradeShips);
+  desiredShips = Math.min(Math.max((tradeShipMultiplier+1)*numShips,5),maxTradeShips);
   if (numShips<maxTradeShips) {
     bb = {
       name:"Buying some trade ships",
@@ -1309,8 +1320,8 @@ function executeLoop () {
   }
 
   // set the quadratic buildings to the appropriate state
-  for (i in quadraticBuildingList) {
-    var bld = gamePage.bld.get(quadraticBuildingList[i]);
+  for (i in qBldList) {
+    bld = qBldList[i];
     bld.on = bld.val*quadraticBuildingsOn;
   }
 
