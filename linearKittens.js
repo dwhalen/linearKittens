@@ -1,6 +1,6 @@
 // Uses owl-deepcopy: http://oranlooney.com/static/javascript/deepCopy.js
 // and Numeric Javascript: http://numericjs.com/numeric/index.php
-document.body.appendChild(document.createElement('script')).src='http://oranlooney.com/static/javascript/deepCopy.js';
+document.body.appendChild(document.createElement('script')).src='http://www.oranlooney.com/static/javascript/deepCopy.js';
 document.body.appendChild(document.createElement('script')).src='http://numericjs.com/numeric/lib/numeric-1.2.6.js';
 
 // Number of ticks every second
