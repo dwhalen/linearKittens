@@ -64,6 +64,12 @@ the faith cap during calculations as long as scoreAccumulatedResources is true.*
 scoreAccumulatedResources = false;
 resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights[gamePage.resPool.resources[i].name]=1;}
 
+// This tells the LP to only build buildings that house kittens: useful for the very end game
+// Alternatively, this tells the LP to not build housing at all for IW mode
+onlyBuildHousing = false;
+doNotBuildHousing = false;
+housingBlds = ["Log House","Hut","Space Station","Mansion"];
+
 // Tell the LP that faith is unlimited.  This will be permit the LP to generate
 // more faith while running scoreAccumulatedResources=true;
 // I recommend not activating this, since it might turn your entire economy towards
@@ -98,6 +104,10 @@ quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab"
 // I've also hardcoded in a restriction regarding the timing of building
 // huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
+  // housing is a special case
+  if (doNotBuildHousing && indexOf(housingBlds,button.name)>=0) {return -1;} //don't break IW mode
+  if (onlyBuildHousing && indexOf(housingBlds,button.name)<0) {return -1;} //late endgame
+
   if(button.name=="Catnip Field") return 5;
   if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
@@ -1444,7 +1454,13 @@ function executeLoop () {
 // in a new game, click the gather catnip button
 function autoCatnipFunction() {
   if (gamePage.bld.get("field").val>0) {return;}
-  buttons = gamePage.bonfireTab.buttons;
+  var tab;
+
+  for (var i in gamePage.tabs) {
+    tab = gamePage.tabs[i];
+    if (tab.tabName == "Bonfire") {break;}
+  }
+  buttons = tab.buttons;
   if (buttons.length==0) {return;}
   for (var b in buttons) {
     if (buttons[b].name=="Gather catnip") {
