@@ -381,6 +381,33 @@ function getObjects(game) {
       objects = objects.concat(game.space.planets[planetIndex].buildings);
     }
   }
+
+  // deal sanely with staging
+  for (var i in objects) {
+    var ob = objects[i];
+
+    if (ob.stages) {
+
+      //upgrade immediately.
+      // I should probably put this check somewhere else, so that I can decide properly whether
+      // to upgrade, but here works as a hack.  The actual upgrade procedure is copied from the
+      // building.js source file, but is liable to change
+      while (ob.stage < ob.stages.length-1 && ob.stages[ob.stage+1].stageUnlocked) {
+        // upgrade!  (maybe I should sell first)
+        ob.stage = ob.stage || 0;
+				ob.stage++;
+
+				ob.val = 0;
+      }
+
+
+      objects[i]=ob.stages[ob.stage];
+
+      // corrects for the fact that the stage 0 amphitheatre doesn't have stageUnlocked set to true
+      if(ob.stage == 0 && ob.unlocked && !ob.stages[ob.stage].stageUnlocked) {objects[i].stageUnlocked=true;}
+    }
+  }
+
   return objects;
 }
 
@@ -562,9 +589,11 @@ function getBuildingResearchButtons() {
   transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
   for (var oi in objects) {
     object = objects[oi];
+
     if (// the faith part follows the definition of updateEnabled in religion.js
       (object.unlocked && object.upgradable && !object.faith) ||
-      ((object.unlocked) && !(object.researched)&& !object.faith) ||
+      (object.stageUnlocked) ||
+      (object.unlocked && !object.researched && !object.faith) ||
       (object.faith && !object.researched)||
       (object.faith && object.upgradable && transcendenceResearched)
       ) {
