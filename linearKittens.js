@@ -387,6 +387,7 @@ function getObjects(game) {
     var ob = objects[i];
 
     if (ob.stages) {
+      if (!ob.stage) {ob.stage=0;}
 
       //upgrade immediately.
       // I should probably put this check somewhere else, so that I can decide properly whether
