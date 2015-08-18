@@ -1461,6 +1461,7 @@ function executeLoop () {
         // try to build it.
         console.log("  Constructing",buildButton.name);
         buildButton.onClick(genericEvent);
+        event = genericEvent; // this is an ugly hack to compensate for the definition of onClick for the Research Vessel program
         if (constructionResetsPlanning) {
           if (linearKittensOn) {setTimeout(planLoop,1);}
           return;
