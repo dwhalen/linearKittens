@@ -68,7 +68,7 @@ resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights
 // Alternatively, this tells the LP to not build housing at all for IW mode
 onlyBuildHousing = false;
 doNotBuildHousing = false;
-housingBlds = ["Log House","Hut","Space Station","Mansion"];
+housingBlds = ["Log House","Hut","Space Station","Mansion","Eludium Huts","Ironwood Huts","Concrete Huts","Unobtanium Huts"];
 
 // Tell the LP that faith is unlimited.  This will be permit the LP to generate
 // more faith while running scoreAccumulatedResources=true;
@@ -96,7 +96,7 @@ tradeScaling = 1000;
 // on.  This may break everything if you have insufficiently many oil wells.
 // Current plan is to disable this if a planning loop fails and then reenable an hour later.
 quadraticBuildingsOn = true;
-quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab","reactor","moonBase","spaceStation"];
+quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab","reactor","moonBase","spaceStation","accelerator"];
 
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
@@ -104,6 +104,9 @@ quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab"
 // I've also hardcoded in a restriction regarding the timing of building
 // huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
+  if(button.name=="Buying some trade ships" && gamePage.resPool.get("ship").val>maxTradeShips) return 0.0001*(1+tradeShipMultiplier)/(tradeShipMultiplier); // much less important if over cap
+  if(button.name=="Buying some trade ships") return (1+tradeShipMultiplier)/(tradeShipMultiplier); // the difference in value between current trade ships and target trade ships should be 1
+
   // housing is a special case
   if (doNotBuildHousing && indexOf(housingBlds,button.name)>=0) {return -1;} //don't break IW mode
   if (onlyBuildHousing && indexOf(housingBlds,button.name)<0) {return -1;} //late endgame
@@ -111,7 +114,6 @@ function buildableWeight(button) {
   if(button.name=="Catnip Field") return 5;
   if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return 0;}
-  if(button.name=="Buying some trade ships") return (1+tradeShipMultiplier)/(tradeShipMultiplier); // the difference in value between current trade ships and target trade ships should be 1
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}//Order of Light objects
@@ -1182,15 +1184,15 @@ function getExtraButtons() {
 
 
   numShips = gamePage.resPool.get("ship").value;
-  desiredShips = Math.min(Math.max((tradeShipMultiplier+1)*numShips,5),maxTradeShips);
-  if (numShips<maxTradeShips) {
-    bb = {
-      name:"Buying some trade ships",
-      getPrices:function () {return [{name:"ship",val:desiredShips}];},
-      onClick: function(){}
-    };
-    out.push(bb);
-  }
+
+  // discourage purchase of tankers
+  desiredShips = Math.max((tradeShipMultiplier+1)*numShips,5);
+  bb = {
+    name:"Buying some trade ships",
+    getPrices:function () {return [{name:"ship",val:desiredShips}];},
+    onClick: function(){}
+  };
+  out.push(bb);
 
   return out;
 }
