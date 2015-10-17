@@ -12,6 +12,14 @@ Wait a couple of seconds.  Once linearKittens has been loaded, it can be started
 startLinearKittens();
 stopLinearKittens();
 
+OTHER OPTIONS
+
+linearKittens can be set to respect Iron Will mode by setting
+doNotBuildHousing = true;
+
+linearKittens can be set to only build housing-related buildings and housing-related research, so as to maximize number of kittens before a game reset, by setting
+onlyBuildHousing = true;
+
 USING THE AI AS A RESOURCE MANAGEMENT SCRIPT
 
 linearKittens can also be made less active.  Its capacity to build can be disabled, and the script can be made to just optimize production and keep resources from hitting the cap.  To set up linearKittens like this, do the following.  Load the AI by running
