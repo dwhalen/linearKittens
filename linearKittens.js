@@ -96,7 +96,7 @@ tradeScaling = 1000;
 // on.  This may break everything if you have insufficiently many oil wells.
 // Current plan is to disable this if a planning loop fails and then reenable an hour later.
 quadraticBuildingsOn = true;
-quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab","reactor","moonBase","spaceStation","accelerator"];
+quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab","reactor","moonBase","spaceStation","accelerator","orbitalArray"];
 
 // The weights for the buildables, used to prioritize certain buildings or research
 // The most consistant way to handle this is probably to calculate them when we read
