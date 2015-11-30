@@ -68,7 +68,7 @@ resourceWeights = {}; for (var i in gamePage.resPool.resources) {resourceWeights
 // Alternatively, this tells the LP to not build housing at all for IW mode
 onlyBuildHousing = false;
 doNotBuildHousing = false;
-housingBlds = ["Log House","Hut","Space Station","Mansion","Eludium Huts","Ironwood Huts","Concrete Huts","Unobtanium Huts"];
+housingBlds = ["Log House","Hut","Space Station","Mansion","Eludium Huts","Ironwood Huts","Concrete Huts","Unobtainium Huts"];
 
 // Tell the LP that faith is unlimited.  This will be permit the LP to generate
 // more faith while running scoreAccumulatedResources=true;
@@ -117,6 +117,8 @@ function buildableWeight(button) {
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}//Order of Light objects
+
+  if (indexOf(getValues(button.getPrices(),"name"),"timeCrystal")>=0) {return -1;} // don't spend time crystals
   return 1;
 }
 
