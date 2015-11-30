@@ -166,6 +166,7 @@ function respawnCopy () {
 // to make sure we find all the new buttons
 function refreshTabs () {
   for(var i = 0; i<gamePage.tabs.length;i++) {
+    if(gamePage.tabs[i].tabId=="Stats") {continue;}
     gamePage.tabs[i].render();
   }
 }
