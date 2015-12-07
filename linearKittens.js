@@ -200,6 +200,10 @@ function getSingleTradeRate (button,prepay) {
     resourceFromName.value = cost[j].val;
   }
 
+  // For the sacrifices, we need to make sure the button is enabled.
+  // We could refresh the religion tab after changing resources, but this is easier.
+  button.enabled=true;
+
   // now try the trade.
   beforeResources = getValues(gameCopy.resPool.resources,"value");
   if (prepay) {button.payPrice();}
