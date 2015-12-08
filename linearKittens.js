@@ -726,7 +726,7 @@ function numPurchasableBeforeCap(returnVector) {
   return returnMin;
 }
 
-function numPurchasable(prices) {
+function numPurchasable(prices,reserveResources) {
   var costVec = costToVector(prices);
   var localResourceQuantity = getValues(gamePage.resPool.resources,'value');
   localResourceQuantity=numeric.sub(localResourceQuantity,reserveResources);
@@ -1298,60 +1298,9 @@ function executeLoop () {
   if (!linearKittensOn) {return;}
 
   console.log ("\nEXECUTION LOOP");
-  console.log("  Remaining trades:");
   loop3Counter = (loop3Counter+1)%10;
-  printTrades();
 
-  // try to do all the trades.
-  var canPerformBadTrades = false;
-  var madeTrade = false;
-
-  while (true) {
-    //console.log("starting trade loop.  bad trades:", canPerformBadTrades);
-    madeTrade = false;
-
-    for (var i in tradesToDo) {
-      //console.log(tradesToDo[i]);
-      if (tradesToDo[i]<=0) {continue;}
-
-      // atempt to perform the trade.
-      var button = tradeButtons[i];
-      var costs = button.getPrices();
-      var canBuild = numPurchasable(costs);
-      if (canBuild==0) {continue;}
-
-      var goodBuilds = numPurchasableBeforeCap(tradeReturns[i]); // real value geq 0
-      if (!canPerformBadTrades && goodBuilds <1) {continue;} // there are builds, but not any that won't pass the resource cap.
-
-      // at this point, check to see whether performUncappedTrades prevents this trade
-      if (!performUncappedTrades && !usesLimitedResources(costs)) {continue;}
-
-      //console.log(costs,canBuild);
-      canBuild = Math.min(canBuild,tradesToDo[i]);
-      if (!canPerformBadTrades) {
-        canBuild = Math.min(canBuild,Math.floor(goodBuilds));
-      }
-      //console.log("performing ", canBuild, " trades of ",goodBuilds, " good trades of ",button.name,button.race);
-
-      if (canBuild<=0) {continue;}
-
-
-      tradesToDo[i]-=canBuild;
-      //console.log(currenttemp = getValues(gamePage.resPool.resources,'value'));
-      executePerformTrades(button,canBuild);
-      //console.log(numeric.sub(getValues(gamePage.resPool.resources,'value'),currenttemp));
-      madeTrade = true;
-
-      // this is the only bad trade we are allowed to do in this loop
-      if (canPerformBadTrades) {canPerformBadTrades=false; break;}
-    }
-
-    // If we can't make any trades, including the bad ones, stop trading.
-    // If we didn't make any good trades, start considering the bad ones.
-    if (!madeTrade && canPerformBadTrades) {break;}
-    if (!madeTrade) {canPerformBadTrades=true;}
-  }
-
+  // ACTIVATE BUILDINGS
   // set a bunch of buildings to the appropriate state.  Skip the buttons.
   for(var i in bldList) {
     var bld = bldList[i];
@@ -1374,7 +1323,7 @@ function executeLoop () {
     bld.on = bld.val*quadraticBuildingsOn;
   }
 
-  // assign kittens to the appropriate jobs
+  // ASSIGN KITTENS
   // do so cleverly, or something, by minimizing number of operations.
   numKittens = gamePage.village.getKittens();
   var toJobs = numeric.max(numeric.floor(jobsToDo),0);
@@ -1458,6 +1407,73 @@ function executeLoop () {
     if(toJobs[i]>0) {console.log("   ",jobList[i].title,":",toJobs[i]);}
   }
 
+
+  // PERFORM TRADES
+  console.log("  Remaining trades:");
+  printTrades();
+
+  // get the new resource consumption rates.  We'll add this to the buffer to fix issue #11.
+  recalculateProduction(gamePage);
+  var resourcesPerTick=getValues(gamePage.resPool.resources,"perTickUI");
+  var resourcesPerExecutionLoop = numeric.mul(resourcesPerTick, Math.ceil(executionInterval * ticksPerSecond) );
+  var consumptionBuffer = numeric.max(0,numeric.mul(resourcesPerExecutionLoop,-1.0));
+  var currentResources = getValues(gamePage.resPool.resources,'value');
+  consumptionBuffer = numeric.min(currentResources,consumptionBuffer);
+  //console.log(reserveResources);
+  //console.log(consumptionBuffer);
+  //console.log(numeric.add(reserveResources,consumptionBuffer) );
+
+  // try to do all the trades.
+  var canPerformBadTrades = false;
+  var madeTrade = false;
+
+  while (true) {
+    //console.log("starting trade loop.  bad trades:", canPerformBadTrades);
+    madeTrade = false;
+
+    for (var i in tradesToDo) {
+      //console.log(tradesToDo[i]);
+      if (tradesToDo[i]<=0) {continue;}
+
+      // atempt to perform the trade.
+      var button = tradeButtons[i];
+      var costs = button.getPrices();
+      var canBuild = numPurchasable(costs, numeric.add(reserveResources,consumptionBuffer) );
+      if (canBuild==0) {continue;}
+
+      var goodBuilds = numPurchasableBeforeCap(tradeReturns[i]); // real value geq 0
+      if (!canPerformBadTrades && goodBuilds <1) {continue;} // there are builds, but not any that won't pass the resource cap.
+
+      // at this point, check to see whether performUncappedTrades prevents this trade
+      if (!performUncappedTrades && !usesLimitedResources(costs)) {continue;}
+
+      //console.log(costs,canBuild);
+      canBuild = Math.min(canBuild,tradesToDo[i]);
+      if (!canPerformBadTrades) {
+        canBuild = Math.min(canBuild,Math.floor(goodBuilds));
+      }
+      //console.log("performing ", canBuild, " trades of ",goodBuilds, " good trades of ",button.name,button.race);
+
+      if (canBuild<=0) {continue;}
+
+
+      tradesToDo[i]-=canBuild;
+      //console.log(currenttemp = getValues(gamePage.resPool.resources,'value'));
+      executePerformTrades(button,canBuild);
+      //console.log(numeric.sub(getValues(gamePage.resPool.resources,'value'),currenttemp));
+      madeTrade = true;
+
+      // this is the only bad trade we are allowed to do in this loop
+      if (canPerformBadTrades) {canPerformBadTrades=false; break;}
+    }
+
+    // If we can't make any trades, including the bad ones, stop trading.
+    // If we didn't make any good trades, start considering the bad ones.
+    if (!madeTrade && canPerformBadTrades) {break;}
+    if (!madeTrade) {canPerformBadTrades=true;}
+  }
+
+  // BUILD BUILDINGS
   // Check whether we can build any of the the buildings
   currentlyAllowedButtons = allowedButtons;
   allowedButtons=[];
@@ -1465,7 +1481,7 @@ function executeLoop () {
     for (i in currentlyAllowedButtons) {
       var buildButton = currentlyAllowedButtons[i];
       buttonPrices=buildButton.getPrices();
-      var canBuildNow = numPurchasable(buttonPrices);
+      var canBuildNow = numPurchasable(buttonPrices,reserveResources);
       if (canBuildNow>0) {
         // try to build it.
         console.log("  Constructing",buildButton.name);
