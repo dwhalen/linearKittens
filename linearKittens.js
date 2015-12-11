@@ -1548,7 +1548,9 @@ function autoPrayFunction() {  //heavily modified autopray
   }
 
   faith = gamePage.resPool.get('faith');
-  if (faith.value > 0.9*faith.maxValue) {
+  accumulatedFaith = gamePage.religion.faith;
+  if (faith.value > 0.9*faith.maxValue || faith.value > 0.1 * accumulatedFaith + 1) {
+    // spending faith early is a good idea when we have low faith
     gamePage.religionTab.praiseBtn.onClick();
   }
 }
