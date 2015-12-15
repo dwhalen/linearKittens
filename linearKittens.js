@@ -113,7 +113,8 @@ function buildableWeight(button) {
 
   if(button.name=="Catnip Field") return 5;
   if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
-    {return 0;}
+    {return -1;} //hack: don't build a second hut until we have farmers
+
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
   if ('transcendence' in button) {return 10;}//Order of Light objects
@@ -212,10 +213,16 @@ function getSingleTradeRate (button,prepay) {
   } else {
     button.onClick(genericEvent);
   }
+  //for some reason, modifying gameCopy resources amounts changes the storage for gamePage instead.
+  //we immediately correct for that.
+  gamePage.upgrade(gamePage.workshop.getCraft("ship").upgrades)
+  gamePage.upgrade(gamePage.workshop.getCraft("compedium").upgrades)
+
   afterResources = getValues(gameCopy.resPool.resources,"value");
   deltaResources = numeric.sub(afterResources,beforeResources);
   return deltaResources;
 }
+
 function getAverageTradeRate (amt,button,prepay) { //slow.  There should be a faster way.
   if (amt<1) {console.error("getAverageTradeRate: needs positive trade quantity.");}
   var rate = getSingleTradeRate(button,prepay);
@@ -1547,9 +1554,10 @@ function autoPrayFunction() {  //heavily modified autopray
     }
   }
 
-  faith = gamePage.resPool.get('faith');
-  accumulatedFaith = gamePage.religion.faith;
-  if (faith.value > 0.9*faith.maxValue || faith.value > 0.1 * accumulatedFaith + 1) {
+  var faith = gamePage.resPool.get('faith');
+  var accumulatedFaith = gamePage.religion.faith;
+  var faithRatio = gamePage.religion.faithRatio;
+  if (faith.value > 0.9*faith.maxValue || faith.value > accumulatedFaith/faithRatio + 1) {
     // spending faith early is a good idea when we have low faith
     gamePage.religionTab.praiseBtn.onClick();
   }
