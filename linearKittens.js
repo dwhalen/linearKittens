@@ -1534,7 +1534,7 @@ function autoCatnipFunction() {
 
 //starclick and autopray by Browsing_From_Work from https://www.reddit.com/r/kittensgame/comments/2eqlt5/a_few_kittens_game_scripts_ive_put_together/
 //clearInterval(starClick);clearInterval(autoPray);
-function starClickFunction () { $("#gameLog").find("input").click(); }
+function starClickFunction () { $("#observeBtn").click(); }
 function autoPrayFunction() {  //heavily modified autopray
   // exit if we haven't unlocked the relgion tab yet
   if (!gamePage.religionTab.visible) {return;}
@@ -1574,7 +1574,7 @@ function startLinearKittens() {
 
   linearKittensOn = true;
   autoCatnip = setInterval(autoCatnipFunction,2000);
-  starClick = setInterval(starClickFunction, 1*1000);
+  starClick = setInterval(starClickFunction, 5*1000);
   autoPray = setInterval(autoPrayFunction,1*1000);
 
   respawnCopy();
