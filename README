@@ -5,7 +5,7 @@ USING THE AI
 
 linearKittens needs to be loaded into the javascript console, which can be done with the command
 
-$.getScript("https://rawgit.com/dwhalen/linearKittens/master/linearKittens.js");
+document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/linearKittens.js';
 
 Wait a couple of seconds.  Once linearKittens has been loaded, it can be started and stopped by running respectively
 
