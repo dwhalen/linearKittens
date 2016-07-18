@@ -237,7 +237,7 @@ function setCopyResourcesToZero () {
     resArray[i].value=0;
   }
 }
-function getSingelHuntRateWithoutCost () {
+function getSingleHuntRateWithoutCost () {
   setCopyResourcesToZero();
   var beforeResources = getValues(gameCopy.resPool.resources,"value");
   gameCopy.village.sendHuntersInternal();  //previously: gameCopy.villageTab.sendHunterSquad();
@@ -248,9 +248,9 @@ function getSingelHuntRateWithoutCost () {
 
 function getAverageHuntRate (amt) { //because fuck binding
   if (amt<1) {console.error("getAverageTradeRate: needs positive trade quantity.");}
-  var rate = getSingelHuntRateWithoutCost();
+  var rate = getSingleHuntRateWithoutCost();
   for (var i=1;i<amt;i++) {
-    rate = numeric.add(rate,getSingelHuntRateWithoutCost());
+    rate = numeric.add(rate,getSingleHuntRateWithoutCost());
   }
   var costVec = costToVector(gameCopy.villageTab.huntBtn.prices);
   return numeric.sub(numeric.div(rate,amt),costVec);
@@ -388,10 +388,13 @@ function getObjects(game) {
     game.bld.meta[0].meta,
     game.science.techs,
     game.workshop.meta[0].meta,
-    game.religion.meta[0].meta,
-    game.religion.meta[1].meta,
+    // game.religion.meta[0].meta,
+    // game.religion.meta[1].meta,
     game.space.programs
   );
+  for (var i in game.religion.meta) {objects = objects.concat(game.religion.meta[i].meta);}
+  //console.log(getValues(objects,"name"))
+
   for (var planetIndex in game.space.planets) {
     if (game.space.planets[planetIndex].buildings) {
       objects = objects.concat(game.space.planets[planetIndex].buildings);
@@ -600,6 +603,9 @@ function getBuildingResearchButtons() {
 
   var buttonList=getActivatableButtons();
   objects =  getObjects(gamePage);
+
+  //console.log(buttonList)
+  //console.log(objects)
 
   availablebuttons = [];
 
