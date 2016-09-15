@@ -43,6 +43,8 @@ executionInterval = 5;
 This could be useful on slower computers or if gamePage.rate is large.  Leaving it on
 will cause a 10-30% slow-down in game speed.  This can be modified after loading the
 script. */
+/* This is now vital because we're stealing the global game variable for
+the calculations to calculate the LP parameters.  DO NOT CHANGE THIS. */
 pauseDuringCalculations = true;
 
 // If autoBuy is on, linearKittens will buy the buildings that it has planned for.
@@ -109,6 +111,7 @@ function buildableWeight(button) {
 
   // housing is a special case
   if (doNotBuildHousing && indexOf(housingBlds,button.name)>=0) {return -1;} //don't break IW mode
+  if (doNotBuildHousing && button.buildingName && gamePage.bld.get(button.buildingName).breakIronWill) {return -1} // really don't break IW
   if (onlyBuildHousing && indexOf(housingBlds,button.name)<0) {return -1;} //late endgame
 
   if(button.name=="Catnip Field") return 5;
@@ -156,22 +159,6 @@ function range (n) {
     out.push(i);
   }
   return out;
-}
-
-// Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
-// so we should use this sparingly.
-function respawnCopy () {
-  gameCopy = owl.deepCopy(gamePage);
-  gameCopy.village.jobs = owl.deepCopy(gamePage.village.jobs);
-}
-
-// refreshTabs asks the game to redraw all the tabs.  We should run this frequently
-// to make sure we find all the new buttons
-function refreshTabs () {
-  for(var i = 0; i<gamePage.tabs.length;i++) {
-    if(gamePage.tabs[i].tabId=="Stats") {continue;}
-    gamePage.tabs[i].render();
-  }
 }
 
 // slices a property across an array.
@@ -316,38 +303,23 @@ function getTradeRates () {
   return [buttonlist,returns];
 }
 
-// Ask the game to update perTickUI for all resources
-// This make break with space production buildings
-function recalculateProduction(game) {
-  game.village.updateResourceProduction();
-
-  game.village.invalidateCachedEffects();
-  game.bld.invalidateCachedEffects();
-  game.workshop.invalidateCachedEffects();
-  game.religion.invalidateCachedEffects();
-
-  game.updateResources();
-}
-
 // Find the production rate associated with a building.
 function getProductionRateForBuilding (bld) {
   var togglable = bld.togglable;
   var tunable = bld.tunable;
   if (!togglable && !tunable) {
-    return numeric.mul(getValues(gameCopy.resPool.resources,"perTickUI"),0);
+    return numeric.mul(productionVector(gameCopy),0);
   }
 
   // turn them all off
   bld.on=0;
-  recalculateProduction(gameCopy);
-  var beforeResources=getValues(gameCopy.resPool.resources,"perTickUI");
+  var beforeResources=productionVector(gameCopy) ;
 
   // turn all of our buildings on
   bld.on=bld.val;
+  bld.on=3;
 
-  recalculateProduction(gameCopy);
-  var afterResources=getValues(gameCopy.resPool.resources,"perTickUI");
-
+  var afterResources=productionVector(gameCopy);
   var deltaResources = numeric.sub(afterResources,beforeResources);
 
   // turn off again, just because
@@ -374,9 +346,7 @@ function getNullProductionRate () {
     bld.on = bld.val*quadraticBuildingsOn;
   }
 
-
-  recalculateProduction(gameCopy);
-  var beforeResources=getValues(gameCopy.resPool.resources,"perTickUI");
+  var beforeResources=productionVector(gameCopy);
 
   return beforeResources;
 }
@@ -543,14 +513,12 @@ function getBuildingRates() {
 function getProductionRateForKitten (job) {
   gameCopy.village.clearJobs();
 
-  recalculateProduction(gameCopy);
-  var beforeResources=getValues(gameCopy.resPool.resources,"perTickUI");
+  var beforeResources=productionVector(gameCopy);
 
   // assign a new kitten
   gameCopy.village.assignJob(job);
 
-  recalculateProduction(gameCopy);
-  var afterResources=getValues(gameCopy.resPool.resources,"perTickUI");
+  var afterResources=productionVector(gameCopy);
 
   var deltaResources = numeric.sub(afterResources,beforeResources);
   return deltaResources;
@@ -583,68 +551,7 @@ function unitVectorVal (n,m,val) {
   array[m]=val;
   return array;
 }
-function costToVector(costs) {
-  var resourceNames = getValues(gamePage.resPool.resources,"name");
-  var out = zeros(resourceNames.length);
-  for(var i = 0;i<costs.length;i++) {
-    var name = costs[i].name;
-    var val = costs[i].val;
 
-    var index = indexOf(resourceNames, name);
-    out[index]+=val;
-  }
-  return out;
-}
-
-function getBuildingResearchButtons() {
-  // Now construct objects, which contains all of the building objects
-  // We're going to cross-reference with the buttons to determine what
-  // can be built.
-
-  var buttonList=getActivatableButtons();
-  objects =  getObjects(gamePage);
-
-  //console.log(buttonList)
-  //console.log(objects)
-
-  availablebuttons = [];
-
-  transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
-  for (var oi in objects) {
-    object = objects[oi];
-
-    if (// the faith part follows the definition of updateEnabled in religion.js
-      (object.unlocked && object.upgradable && !object.faith) ||
-      (object.stageUnlocked) ||
-      (object.unlocked && !object.researched && !object.faith) ||
-      (object.faith && !object.researched)||
-      (object.faith && object.upgradable && transcendenceResearched)
-      ) {
-      // buildable in theory
-      for (var bi=0;bi<buttonList.length;bi++) {
-        bu=buttonList[bi];
-        if (bu.name==object.title||bu.name==object.label) {break;}
-      }
-      if (bi<buttonList.length) {
-        availablebuttons.push(bu);
-      }
-    }
-  }
-
-  //console.log(getValues(availablebuttons,"name"));
-  return availablebuttons;
-}
-
-function getResourceQuantityAndMax () {
-  var resList = gamePage.resPool.resources;
-  resourceQuantity = getValues(resList,'value');
-  resourceQuantity = numeric.max(resourceQuantity,0);
-
-  resourceMax = zeros(resourceQuantity.length);
-  for (var i in resourceMax) {
-    resourceMax[i]=getResourceMax(resList[i]);
-  }
-}
 
 
 resourceGlobalMaxes=false;
@@ -815,6 +722,141 @@ function randomInteger(probs) {
   return -1;
 }
 
+
+
+
+/*
+INTERFACE
+These functions describe the interface between the code and the game.
+*/
+
+// Spawns a new copy of gamePage into gameCopy to manipulate. Takes ~250ms,
+// so we should use this sparingly.
+function respawnCopy () {
+  gameCopy = owl.deepCopy(gamePage);
+  gameCopy.village.jobs = owl.deepCopy(gamePage.village.jobs);
+  gameCopy.isPaused=false // so that we can run ticks.  
+
+  game = gameCopy; // this is needed for the effects updates.
+  
+  // we also want to run a tick to make sure that the
+  // buildings are not capped out.
+  getModerateAmountOfResources(gameCopy);
+  gameCopy.updateModel() // run a tick
+}
+
+function closeCopy() {
+  game = gamePage;
+}
+
+// refreshTabs asks the game to redraw all the tabs.  We should run this frequently
+// to make sure we find all the new buttons
+function refreshTabs () {
+  for(var i = 0; i<gamePage.tabs.length;i++) {
+    //console.log(gamePage.tabs[i].tabId);
+    if(gamePage.tabs[i].tabId=="Stats") {continue;}
+    gamePage.tabs[i].render();
+  }
+}
+
+// Get half of our max resource count.  I don't think anything
+// consumes resources without resouce caps at the moment, but if so,
+// we need to fix this to give some of those as well.
+function getModerateAmountOfResources(game) {
+  for (var i in game.resPool.resources) {
+    var res = game.resPool.resources[i];
+    if (res.maxValue > 0) {
+      res.value = res.maxValue/2.0;
+    }
+  }
+}
+
+// Ask the game to update perTickCached for all resources
+// This make break with space production buildings
+function recalculateProduction(game) {
+  game.village.updateResourceProduction();
+  // in order to correctly calculate some of the building productions,
+  // we need to have resources to consume
+  game.updateCaches();  // this should update all the resources
+  game.calculateAllEffects();
+  //game.updateResources();
+}
+
+// get the perTickCached of
+function productionVector(game) {
+  recalculateProduction(game);
+  
+  var out = [];
+  var name;
+  for (var i in game.resPool.resources) {
+    name = game.resPool.resources[i].name;
+    out.push(game.getResourcePerTick(name, true)); // true into withConversion
+  }
+  return out;
+  // return getValues(gameCopy.resPool.resources,"perTickCached");
+}
+
+function costToVector(costs) {
+  var resourceNames = getValues(gamePage.resPool.resources,"name");
+  var out = zeros(resourceNames.length);
+  for(var i = 0;i<costs.length;i++) {
+    var name = costs[i].name;
+    var val = costs[i].val;
+
+    var index = indexOf(resourceNames, name);
+    out[index]+=val;
+  }
+  return out;
+}
+
+function getBuildingResearchButtons() {
+  // Now construct objects, which contains all of the building objects
+  // We're going to cross-reference with the buttons to determine what
+  // can be built.
+
+  var buttonList=getActivatableButtons();
+  objects =  getObjects(gamePage);
+
+  availablebuttons = [];
+
+  transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
+  for (var oi in objects) {
+    object = objects[oi];
+
+    if (// the faith part follows the definition of updateEnabled in religion.js
+      (object.unlocked && object.upgradable && !object.faith) ||
+      (object.stageUnlocked) ||
+      (object.unlocked && !object.researched && !object.faith) ||
+      (object.faith && !object.researched)||
+      (object.faith && object.upgradable && transcendenceResearched)
+      ) {
+      // buildable in theory
+      for (var bi=0;bi<buttonList.length;bi++) {
+        bu=buttonList[bi];
+        if (bu.name==object.title||bu.name==object.label) {break;}
+      }
+      if (bi<buttonList.length) {
+        availablebuttons.push(bu);
+      }
+    }
+  }
+
+  return availablebuttons;
+}
+
+function getResourceQuantityAndMax () {
+  var resList = gamePage.resPool.resources;
+  resourceQuantity = getValues(resList,'value');
+  resourceQuantity = numeric.max(resourceQuantity,0);
+
+  resourceMax = zeros(resourceQuantity.length);
+  for (var i in resourceMax) {
+    resourceMax[i]=getResourceMax(resList[i]);
+  }
+}
+
+
+
 /* LINEAR PROGRAM
 **********************************************************************
 **********************************************************************
@@ -870,6 +912,7 @@ function linearProgram (time) {
   respawnCopy();
   getResourceQuantityAndMax();
   getLPParameters (gamePage);
+  closeCopy();
   numResources = resourceMax.length;
 
   // get costs of buildings, but only the ones that are actually buildable.
@@ -1234,7 +1277,7 @@ function planLoop () {
   planningloopseason = gamePage.calendar.season;
   planningloopweather = gamePage.calendar.weather;
 
-  refreshTabs();
+  //refreshTabs();
 
   buttonList = getBuildingResearchButtons();
   buttonList = buttonList.concat(getExtraButtons());
@@ -1380,6 +1423,7 @@ function executeLoop () {
     idealJobs = toJobs[i];
     job = jobList[i];
     if (job.value>idealJobs) {
+      //console.log(job.value, idealJobs)
       getJobButton(job).unassignJobs(job.value-idealJobs);
       getJobButton(job).update();
     }
@@ -1389,6 +1433,7 @@ function executeLoop () {
     idealJobs = toJobs[i];
     job = jobList[i];
     if (job.value<idealJobs) {
+      //console.log(job.value, idealJobs)
       getJobButton(job).assignJobs(idealJobs-job.value);
       getJobButton(job).update();
     }
@@ -1426,8 +1471,7 @@ function executeLoop () {
   printTrades();
 
   // get the new resource consumption rates.  We'll add this to the buffer to fix issue #11.
-  recalculateProduction(gamePage);
-  var resourcesPerTick=getValues(gamePage.resPool.resources,"perTickUI");
+  var resourcesPerTick=productionVector(gamePage);
   var resourcesPerExecutionLoop = numeric.mul(resourcesPerTick, Math.ceil(executionInterval * ticksPerSecond) );
   var consumptionBuffer = numeric.max(0,numeric.mul(resourcesPerExecutionLoop,-1.0));
   var currentResources = getValues(gamePage.resPool.resources,'value');
