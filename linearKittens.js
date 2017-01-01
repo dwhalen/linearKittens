@@ -737,6 +737,9 @@ function respawnCopy () {
   gameCopy.village.jobs = owl.deepCopy(gamePage.village.jobs);
   gameCopy.isPaused=false // so that we can run ticks.  
 
+  // Prevent the game copy from printing messages
+  gameCopy.msg = function(message, type, tag, noBullet){}
+
   game = gameCopy; // this is needed for the effects updates.
   
   // we also want to run a tick to make sure that the
