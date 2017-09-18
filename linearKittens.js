@@ -106,23 +106,23 @@ quadraticBuildingList = ["steamworks","magneto","factory","observatory","biolab"
 // I've also hardcoded in a restriction regarding the timing of building
 // huts in the early game and researching agriculture to prevent early game stalling
 function buildableWeight(button) {
-  if(button.name=="Buying some trade ships" && gamePage.resPool.get("ship").val>maxTradeShips) return 0.0001*(1+tradeShipMultiplier)/(tradeShipMultiplier); // much less important if over cap
-  if(button.name=="Buying some trade ships") return (1+tradeShipMultiplier)/(tradeShipMultiplier); // the difference in value between current trade ships and target trade ships should be 1
+  if(button.model.name=="Buying some trade ships" && gamePage.resPool.get("ship").val>maxTradeShips) return 0.0001*(1+tradeShipMultiplier)/(tradeShipMultiplier); // much less important if over cap
+  if(button.model.name=="Buying some trade ships") return (1+tradeShipMultiplier)/(tradeShipMultiplier); // the difference in value between current trade ships and target trade ships should be 1
 
   // housing is a special case
-  if (doNotBuildHousing && indexOf(housingBlds,button.name)>=0) {return -1;} //don't break IW mode
-  if (doNotBuildHousing && button.buildingName && gamePage.bld.get(button.buildingName).breakIronWill) {return -1} // really don't break IW
-  if (onlyBuildHousing && indexOf(housingBlds,button.name)<0) {return -1;} //late endgame
+  //if (doNotBuildHousing && indexOf(housingBlds,button.model.name)>=0) {return -1;} //don't break IW mode
+  if (doNotBuildHousing && button.model.metadata.breakIronWill) {return -1} // really don't break IW
+  if (onlyBuildHousing && indexOf(housingBlds,button.model.name)<0) {return -1;} //late endgame TODO: verify that this still works
 
-  if(button.name=="Catnip Field") return 5;
-  if(button.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
+  if(button.model.name=="Catnip Field") return 5;
+  if(button.model.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return -1;} //hack: don't build a second hut until we have farmers
 
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
   if (button.tab && button.tab.tabId=="Science") {return 10;}
-  if ('transcendence' in button) {return 10;}//Order of Light objects
+  if ('transcendence' in button.model) {return 10;}//Order of Light objects. TODO: verify that this is the right location
 
-  if (indexOf(getValues(button.getPrices(),"name"),"timeCrystal")>=0) {return -1;} // don't spend time crystals
+  if (indexOf(getValues(button.model.prices,"name"),"timeCrystal")>=0) {return -1;} // don't spend time crystals
   return 1;
 }
 
@@ -179,8 +179,7 @@ function getValues (object,property) {
 function getSingleTradeRate (button,prepay) {
   // set all current resources to 0.
   setCopyResourcesToZero();
-
-  cost = button.getPrices();
+  cost = button.model.prices;
   for(var j=0;j<cost.length;j++) {
     // find the corresponding resource.
     resourceFromName=gameCopy.resPool.get(cost[j].name);
@@ -239,7 +238,7 @@ function getAverageHuntRate (amt) { //because fuck binding
   for (var i=1;i<amt;i++) {
     rate = numeric.add(rate,getSingleHuntRateWithoutCost());
   }
-  var costVec = costToVector(gameCopy.villageTab.huntBtn.prices);
+  var costVec = costToVector(gameCopy.villageTab.huntBtn.model.prices);
   return numeric.sub(numeric.div(rate,amt),costVec);
 }
 
@@ -254,7 +253,7 @@ function getTradeRates () {
   // store the actual button for gamePage in buttonlist
 
   //hunt
-  if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn) {
+  if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn && gamePage.villageTab.huntBtn.model.visible) {
     buttonlist.push(gamePage.villageTab.huntBtn);
     returns.push(getAverageHuntRate(100));
   }
@@ -299,7 +298,6 @@ function getTradeRates () {
       returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeBtn,false));
     }
   }
-
   return [buttonlist,returns];
 }
 
@@ -412,7 +410,7 @@ function getActivatableButtons() {
       // generic tabs: bonfire, workshop, science
       for(var bi in tab.buttons) {
         var button = tab.buttons[bi];
-        if (button.visible) {
+        if (button.model.visible) {
           buttonList.push(button);
         }
       }
@@ -421,7 +419,7 @@ function getActivatableButtons() {
       if (tab.rUpgradeButtons) {
         for(var bi in tab.rUpgradeButtons) {
           var button = tab.rUpgradeButtons[bi];
-          if (button.visible) {
+          if (button.model.visible) {
             buttonList.push(button);
           }
         }
@@ -431,7 +429,7 @@ function getActivatableButtons() {
       if (tab.zgUpgradeButtons) {
         for(var bi in tab.zgUpgradeButtons) {
           var button = tab.zgUpgradeButtons[bi];
-          if (button.visible) {
+          if (button.model.visible) {
             buttonList.push(button);
           }
         }
@@ -442,7 +440,7 @@ function getActivatableButtons() {
         tab.GCPanel.update(); // no idea why the fuck we need this
         for(var bi in tab.GCPanel.children) {
           var button = tab.GCPanel.children[bi];
-          if (button.visible) {
+          if (button.model.visible) {
             buttonList.push(button);
           }
         }
@@ -453,7 +451,7 @@ function getActivatableButtons() {
         for (var panelNumber in tab.planetPanels) {
           for(var bi in tab.planetPanels[panelNumber].children) {
             var button = tab.planetPanels[panelNumber].children[bi];
-            if (button.visible) {
+            if (button.model.visible) {
               buttonList.push(button);
             }
           }
@@ -653,6 +651,7 @@ function numPurchasable(prices,reserveResources) {
   localResourceQuantity=numeric.max(localResourceQuantity,0);
 
   var quotient = numeric.div(localResourceQuantity,costVec);
+  //console.log(quotient, localResourceQuantity, prices, costVec);
   for (var i in quotient) {
     if (localResourceQuantity[i]==0) {
       if (costVec[i]==0) {quotient[i]=Infinity;} else {quotient[i]=0;}
@@ -689,7 +688,8 @@ function listMin(array) {
 function getJobButton(job) {
   var blist = gamePage.villageTab.buttons;
   for (var i in blist) {
-    if (blist[i].name==job.title) {return blist[i];}
+    //console.log(blist[i]);
+    if (blist[i].model.job.title==job.title) {return blist[i];}
   }
   console.error("Failed to find button for job",job.title);
   return null;
@@ -735,13 +735,17 @@ These functions describe the interface between the code and the game.
 function respawnCopy () {
   gameCopy = owl.deepCopy(gamePage);
   gameCopy.village.jobs = owl.deepCopy(gamePage.village.jobs);
-  gameCopy.isPaused=false // so that we can run ticks.  
+  gameCopy.isPaused=false // so that we can run ticks.
 
   // Prevent the game copy from printing messages
   gameCopy.msg = function(message, type, tag, noBullet){}
 
+  // prevent the copy from updating the ui
+  gameCopy.ui.update = function() {};
+  gameCopy.ui.render = function() {};
+
   game = gameCopy; // this is needed for the effects updates.
-  
+
   // we also want to run a tick to make sure that the
   // buildings are not capped out.
   getModerateAmountOfResources(gameCopy);
@@ -788,7 +792,7 @@ function recalculateProduction(game) {
 // get the perTickCached of
 function productionVector(game) {
   recalculateProduction(game);
-  
+
   var out = [];
   var name;
   for (var i in game.resPool.resources) {
@@ -811,6 +815,10 @@ function costToVector(costs) {
   }
   return out;
 }
+function assertDefined(x) {
+  if(typeof x == 'undefined') {console.error("Invalid undefined.");}
+}
+function isDefined(x){return (typeof x != 'undefined');}
 
 function getBuildingResearchButtons() {
   // Now construct objects, which contains all of the building objects
@@ -836,7 +844,15 @@ function getBuildingResearchButtons() {
       // buildable in theory
       for (var bi=0;bi<buttonList.length;bi++) {
         bu=buttonList[bi];
-        if (bu.name==object.title||bu.name==object.label) {break;}
+        if (!isDefined(bu.model.metadata)) {
+          //console.log("skipping", bu);
+          continue;
+        }
+        if (!isDefined(bu.model.metadata.label)) {console.error("button.model.metadata.label not defined:", bu);}
+        if (bu.model.metadata.label==object.title||bu.model.metadata.label==object.label) {
+          //console.log("matched", object, bu);
+          break;
+        }
       }
       if (bi<buttonList.length) {
         availablebuttons.push(bu);
@@ -923,8 +939,10 @@ function linearProgram (time) {
   buttonList = buttonList.concat(getExtraButtons());
   buildableButtonList=[];
   var buttonCosts = [];
+  //console.log("buttonList", buttonList);
   for (var i in buttonList) {
-    cost = costToVector(buttonList[i].getPrices());
+    //console.log("button", buttonList[i]);
+    cost = costToVector(buttonList[i].model.prices);
     if (isBuildable(cost,numeric.sub(resourceMax,reserveResources))) {
       buttonCosts.push(cost);
       buildableButtonList.push(buttonList[i]);
@@ -936,12 +954,15 @@ function linearProgram (time) {
   buttonWeights = [];
   for (i in buildableButtonList) {
     var weight = buildableWeight(buildableButtonList[i]);
+    // We need to break ties, otherwise neither building will be built.
+    // We could just build anything we have resources for, but that would
+    // prevent us from saving up for research.
     weight*= 1 + randomBuildingWeightScaling* Math.random();
     buttonWeights.push(weight);
   }
 
   //List the buttons that we're considering
-  console.log("  Considering buttons:", getValues(buildableButtonList,"name"));
+  console.log("  Considering buttons:", getValues(getValues(buildableButtonList,"model"),"name"));
 
   // minimize objective such that matrix.x<=b
   matrixOfInequalities = [];
@@ -1169,7 +1190,7 @@ function linearProgram (time) {
   console.log("  Planned constructions:");
   for (var i in buttonCompleteness) {
     if (buttonCompleteness[i]>0.001) {
-      console.log("   ",buildableButtonList[i].name,":",Math.round(100*buttonCompleteness[i]),"%");
+      console.log("   ",buildableButtonList[i].model.name,":",Math.round(100*buttonCompleteness[i]),"%");
     }
   }
 
@@ -1223,11 +1244,14 @@ There are a few main loops:
 5 activates every second or so and converts faith if close to the cap
 */
 function getExtraButtons() {
+  // There are a couple of times in the game that we need to accumulate resources,
+  // but not for a specific building, mostly to unlock buildings or religions.
+  // We ask the LP to do this by adding in fake buildings with the corresponding
+  // resources.
   out = [];
   if (!gamePage.bld.get("library").unlocked) {
     bb = {
-      name:"Buying extra wood",
-      getPrices:function () {return [{name:"wood",val:10}];},
+      model:{prices: [{name:"wood",val:10}], name:"Unlocking library"},
       onClick: function(){}
     };
     out.push(bb);
@@ -1235,8 +1259,7 @@ function getExtraButtons() {
 
   if (gamePage.resPool.get("megalith").value < 10 && !gamePage.bld.get("ziggurat").unlocked) {
     bb = {
-      name:"Buying extra megaliths",
-      getPrices:function () {return [{name:"megalith",val:10}];},
+      model:{prices: [{name:"megalith",val:10}], name:"Buying extra megaliths"},
       onClick: function(){}
     };
     out.push(bb);
@@ -1254,8 +1277,7 @@ function getExtraButtons() {
   // discourage purchase of tankers
   desiredShips = Math.max((tradeShipMultiplier+1)*numShips,5);
   bb = {
-    name:"Buying some trade ships",
-    getPrices:function () {return [{name:"ship",val:desiredShips}];},
+    model:{prices: [{name:"ship",val:desiredShips}], name:"Buying some trade ships"},
     onClick: function(){}
   };
   out.push(bb);
@@ -1304,10 +1326,10 @@ function planLoop () {
 function printTrades() {
   for (var i in tradesToDo) {
     if (tradesToDo[i]>0) {
-      if (tradeButtons[i].race) {
-        console.log("   ",tradeButtons[i].race.name,":",tradesToDo[i]);
+      if (tradeButtons[i].model.race) {
+        console.log("   ",tradeButtons[i].model.race.name,":",tradesToDo[i]);
       } else {
-        console.log("   ",tradeButtons[i].name,":",tradesToDo[i]);
+        console.log("   ",tradeButtons[i].model.name,":",tradesToDo[i]);
       }
     }
   }
@@ -1315,10 +1337,10 @@ function printTrades() {
 function printRealTrades() {
   for (var i in realTradesToDo) {
     if (tradesToDo[i]>tradeThreshold) {
-      if (tradeButtons[i].race) {
-        console.log("   ",tradeButtons[i].race.name,":",sRound(realTradesToDo[i]));
+      if (tradeButtons[i].model.race) {
+        console.log("   ",tradeButtons[i].model.race.name,":",sRound(realTradesToDo[i]));
       } else {
-        console.log("   ",tradeButtons[i].name,":",sRound(realTradesToDo[i]));
+        console.log("   ",tradeButtons[i].model.name,":",sRound(realTradesToDo[i]));
       }
     }
   }
@@ -1426,9 +1448,9 @@ function executeLoop () {
     idealJobs = toJobs[i];
     job = jobList[i];
     if (job.value>idealJobs) {
-      //console.log(job.value, idealJobs)
-      getJobButton(job).unassignJobs(job.value-idealJobs);
-      getJobButton(job).update();
+      bu = getJobButton(job)
+      bu.controller.unassignJobs(bu.model, job.value-idealJobs);
+      bu.update();
     }
   }
   // add kittens to jobs
@@ -1437,8 +1459,9 @@ function executeLoop () {
     job = jobList[i];
     if (job.value<idealJobs) {
       //console.log(job.value, idealJobs)
-      getJobButton(job).assignJobs(idealJobs-job.value);
-      getJobButton(job).update();
+      bu = getJobButton(job)
+      bu.controller.assignJobs(bu.model, idealJobs-job.value);
+      bu.update();
     }
   }
   // any remaining kittens become farmers if available and something else otherwise
@@ -1448,17 +1471,19 @@ function executeLoop () {
       job = jobList[i];
       if (job.name=="farmer") {
         foundFarmers=true;
-        getJobButton(job).assignJobs(extraKittens);
+        bu = getJobButton(job)
+        bu.controller.assignJobs(bu.model, extraKittens);
         toJobs[i]+=extraKittens;
-        getJobButton(job).update();
+        bu.update();
         break;
       }
     }
     if (!foundFarmers) {
       job = jobList[0];
       toJobs[0]+=extraKittens;
-      getJobButton(job).assignJobs(extraKittens);
-      getJobButton(job).update();
+      bu = getJobButton(job)
+      bu.controller.assignJobs(bu.model, extraKittens);
+      bu.update();
     }
 
   }
@@ -1497,7 +1522,7 @@ function executeLoop () {
 
       // atempt to perform the trade.
       var button = tradeButtons[i];
-      var costs = button.getPrices();
+      var costs = button.model.prices;
       var canBuild = numPurchasable(costs, numeric.add(reserveResources,consumptionBuffer) );
       if (canBuild==0) {continue;}
 
@@ -1540,11 +1565,12 @@ function executeLoop () {
   if (autoBuy) { // if autoBuy is off, we can ignore this entire step.
     for (i in currentlyAllowedButtons) {
       var buildButton = currentlyAllowedButtons[i];
-      buttonPrices=buildButton.getPrices();
+      buttonPrices=buildButton.model.prices;
       var canBuildNow = numPurchasable(buttonPrices,reserveResources);
+      //console.log(buildButton.model.name, buttonPrices, canBuildNow);
       if (canBuildNow>0) {
         // try to build it.
-        console.log("  Constructing",buildButton.name);
+        console.log("  Constructing",buildButton.model.name);
         buildButton.onClick(genericEvent);
         event = genericEvent; // this is an ugly hack to compensate for the definition of onClick for the Research Vessel program
         if (constructionResetsPlanning) {
@@ -1579,8 +1605,11 @@ function autoCatnipFunction() {
   buttons = tab.buttons;
   if (buttons.length==0) {return;}
   for (var b in buttons) {
-    if (buttons[b].name=="Gather catnip") {
-      buttons[b].handler(buttons[b]);
+    if (buttons[b].model.name=="Gather catnip") {
+      console.log("Gathering catnip manually!");
+      //buttons[b].handler(buttons[b]);
+      var gather = buttons[b];
+      gather.controller.buyItem(gather.model, genericEvent, function() {});
     }
   }
 }
@@ -1598,7 +1627,7 @@ function autoPrayFunction() {  //heavily modified autopray
       for (var i in buildableButtonList) {
         if (buttonCompleteness[i]>0.9) {// maybe we should be less conservative than this?
           // this is a building we are going to make
-          var listOfCosts=buildableButtonList[i].getPrices();
+          var listOfCosts=buildableButtonList[i].model.prices();
           for (var j in listOfCosts) {
             if (listOfCosts[j].name=='faith') {return;}
           }
