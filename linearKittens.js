@@ -114,8 +114,10 @@ function buildableWeight(button) {
   if (doNotBuildHousing && button.model.metadata.breakIronWill) {return -1} // really don't break IW
   if (onlyBuildHousing && indexOf(housingBlds,button.model.name)<0) {return -1;} //late endgame TODO: verify that this still works
 
+  //TODO: fix this logic, replacing the button.model.name
   if(button.model.name=="Catnip Field") return 5;
-  if(button.model.name=="Hut"  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
+  if(button.model.opts && button.opts.name=="Catnip Field") return 5;
+  if((button.model.name=="Hut"||(button.opts&&button.opts.name=="Hut"))  && gamePage.bld.get("hut").val>0 && !gamePage.science.get("agriculture").researched)
     {return -1;} //hack: don't build a second hut until we have farmers
 
   if (button.tab && button.tab.tabId=="Workshop") {return 10;}
