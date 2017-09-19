@@ -177,7 +177,6 @@ function getValues (object,property) {
 }
 
 // What happens to your resources when you press this button?
-// prepay is false if payment handled by btn.handler(), e.g. with crafts
 function getSingleTradeRate (button,prepay) {
   // set all current resources to 0.
   setCopyResourcesToZero();
@@ -186,7 +185,7 @@ function getSingleTradeRate (button,prepay) {
     // find the corresponding resource.
     resourceFromName=gameCopy.resPool.get(cost[j].name);
     // set the value to exactly what we need.
-    resourceFromName.value = cost[j].val;
+    resourceFromName.value = 2*cost[j].val;
   }
 
   // For the sacrifices, we need to make sure the button is enabled.
@@ -195,18 +194,21 @@ function getSingleTradeRate (button,prepay) {
 
   // now try the trade.
   beforeResources = getValues(gameCopy.resPool.resources,"value");
-  if (prepay) {button.payPrice();}
+  /*if (prepay) {console.log(button); button.payPrice();}
   if (button.handler) {
     button.handler(button); // some of these may take 0 arguments, instead
   } else {
     button.onClick(genericEvent);
-  }
+  }*/
+  button.controller.buyItem(button.model, genericEvent, function() {})
   //for some reason, modifying gameCopy resources amounts changes the storage for gamePage instead.
   //we immediately correct for that.
   gamePage.upgrade(gamePage.workshop.getCraft("ship").upgrades)
   gamePage.upgrade(gamePage.workshop.getCraft("compedium").upgrades)
 
   afterResources = getValues(gameCopy.resPool.resources,"value");
+  //console.log(beforeResources);
+  //console.log(afterResources);
   deltaResources = numeric.sub(afterResources,beforeResources);
   return deltaResources;
 }
@@ -264,8 +266,10 @@ function getTradeRates () {
   if (gamePage.diplomacyTab.visible) {
     for (var i=0;i<gamePage.diplomacyTab.racePanels.length;i++) {
       // all the buttons that appear here are visible
-      buttonlist.push(gamePage.diplomacyTab.racePanels[i].tradeBtn);
-      returns.push(getAverageTradeRate(100,gameCopy.diplomacyTab.racePanels[i].tradeBtn,true));
+      if (gameCopy.diplomacyTab.racePanels[i].tradeBtn.model.enabled) {
+        buttonlist.push(gamePage.diplomacyTab.racePanels[i].tradeBtn);
+        returns.push(getAverageTradeRate(100,gameCopy.diplomacyTab.racePanels[i].tradeBtn,true));
+      }
     }
   }
 
@@ -602,16 +606,25 @@ function getLPParameters (game) {
   tradeButtons = tradesOut[0];
   tradeReturns = tradesOut[1];
   numTrades = tradeReturns.length;
+  console.log("Consdering trades");
+  console.log(getValues(getValues(tradeButtons, "model"), "name"));
+  console.log(tradeReturns);
 
   var kittensOut = getKittenRates();
   jobList = kittensOut[0];
   jobReturns = kittensOut[1];
   numJobs = jobReturns.length;
+  console.log("Consdering jobs");
+  console.log(getValues(jobList,"title"));
+  console.log(jobReturns);
 
   var bldOut = getBuildingRates();
   bldList = bldOut[0];
   bldReturns = bldOut[1];
   numBlds = bldReturns.length;
+  console.log("Consdering activatable buildings");
+  console.log(getValues(bldList, "label"));
+  console.log(bldReturns);
 
   numResources = resourceQuantity.length;
 
@@ -964,7 +977,7 @@ function linearProgram (time) {
   }
 
   //List the buttons that we're considering
-  console.log("  Considering buttons:", getValues(getValues(buildableButtonList,"model"),"name"));
+  console.log("  Considering building:", getValues(getValues(buildableButtonList,"model"),"name"));
 
   // minimize objective such that matrix.x<=b
   matrixOfInequalities = [];
