@@ -230,7 +230,13 @@ function setCopyResourcesToZero () {
 function getSingleHuntRateWithoutCost () {
   setCopyResourcesToZero();
   var beforeResources = getValues(gameCopy.resPool.resources,"value");
-  gameCopy.village.sendHuntersInternal();  //previously: gameCopy.villageTab.sendHunterSquad();
+  // gameCopy.resPool.get("manpower").value = 100;
+  // if (!gameCopy.villageTab.huntBtn.controller.hasResources(gameCopy.villageTab.huntBtn.model)) {
+  //   console.error("gameCopy has insufficient resources for hunting. Perhaps fix hardcoded value?");
+  // }
+  button = gameCopy.villageTab.huntBtn;
+  button.controller.buyItem.bind(button.controller)(button.model, genericEvent, function() {});
+  gameCopy.village.sendHunters()
   var afterResources = getValues(gameCopy.resPool.resources,"value");
   var deltaResources = numeric.sub(afterResources,beforeResources);
   return deltaResources;
@@ -257,7 +263,7 @@ function getTradeRates () {
   // store the actual button for gamePage in buttonlist
 
   //hunt
-  if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn && gamePage.villageTab.huntBtn.model.visible) {
+  if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn && game.science.get("archery").researched) {
     buttonlist.push(gamePage.villageTab.huntBtn);
     returns.push(getAverageHuntRate(100));
   }
@@ -276,7 +282,7 @@ function getTradeRates () {
   //craft
   if (gamePage.workshopTab.visible) {
     for (var i=0;i<gamePage.workshopTab.craftBtns.length;i++) {
-      if (gamePage.workshopTab.craftBtns[i].visible) {
+      if (gamePage.workshopTab.craftBtns[i].model.visible) {
         buttonlist.push(gamePage.workshopTab.craftBtns[i]);
         returns.push(getSingleTradeRate(gameCopy.workshopTab.craftBtns[i],false));
       }
@@ -529,6 +535,7 @@ function getProductionRateForKitten (job) {
 }
 
 // return the various rates for kitten production
+//TODO: verify that this is calculating catnip consumption correctly.
 function getKittenRates () {
   var joblist = []; // a stored list of jobs, in case things change suddenly
   var returns = [];
@@ -1274,11 +1281,18 @@ function getExtraButtons() {
 
   if (gamePage.resPool.get("megalith").value < 10 && !gamePage.bld.get("ziggurat").unlocked) {
     bb = {
-      model:{prices: [{name:"megalith",val:10}], name:"Buying extra megaliths"},
+      model:{prices: [{name:"megalith",val:10}], name:"Unlocking ziggurat"},
       onClick: function(){}
     };
     out.push(bb);
   }
+  // if (!gamePage.villageTab.huntBtn.model.enabled) {
+  //   bb = {
+  //     model:{prices: [{name:"manpower",val:100}], name:"Unlocking hunt button"},
+  //     onClick: function(){}
+  //   };
+  //   out.push(bb);
+  // }
 
   // explore.  Note that
   if (canExplore()) {
@@ -1642,7 +1656,7 @@ function autoPrayFunction() {  //heavily modified autopray
       for (var i in buildableButtonList) {
         if (buttonCompleteness[i]>0.9) {// maybe we should be less conservative than this?
           // this is a building we are going to make
-          var listOfCosts=buildableButtonList[i].model.prices();
+          var listOfCosts=buildableButtonList[i].model.prices;
           for (var j in listOfCosts) {
             if (listOfCosts[j].name=='faith') {return;}
           }
