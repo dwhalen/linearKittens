@@ -1,7 +1,7 @@
 // Uses owl-deepcopy: http://oranlooney.com/static/javascript/deepCopy.js
 // and Numeric Javascript: http://numericjs.com/numeric/index.php
-//document.body.appendChild(document.createElement('script')).src='http://www.oranlooney.com/static/javascript/deepCopy.js';
-document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/deep_copy.js';
+//document.body.appendChild(document.createElement('script')).src='http://www.oranlooney.com/static/javascript/deepCopy.js'; // Doesn't work because of mixed-content warnings with https
+document.body.appendChild(document.createElement('script')).src='https://rawgit.com/dwhalen/linearKittens/master/deepCopy.js';
 document.body.appendChild(document.createElement('script')).src='https://cdn.rawgit.com/sloisel/numeric/master/src/numeric.js';
 
 // Number of ticks every second
@@ -177,15 +177,35 @@ function getValues (object,property) {
   return resourceNames;
 }
 
+function activateCaravanTrade(button) {
+    // console.log("caravan trade", button);
+    // there's this problem:
+    // the trade buttons for the race panels have a handler, which calls
+    // dojo.partial(function(race){self.game.diplomacy.trade(race);
+    // but the dojo.partial kills the self.game.diplomacy.trade from deep-copying
+    // correctly, and the self.game continues refering to gamePage rather than
+    // gameCopy.
+
+    // the way buyItem usually works is like this:
+    //  this.clickHandler(model, event);
+    //   this.payPrice(model);
+
+    // Instead, what we're going to do is call
+    button.controller.payPrice(button.model);
+    // then bypass the clickHandler and call directly
+    button.game.diplomacy.trade(button.race);
+}
+
 // What happens to your resources when you press this button?
-function getSingleTradeRate (button,prepay) {
+function getSingleTradeRate (button) {
   // set all current resources to 0.
   setCopyResourcesToZero();
   cost = button.model.prices;
   for(var j=0;j<cost.length;j++) {
     // find the corresponding resource.
     resourceFromName=gameCopy.resPool.get(cost[j].name);
-    // set the value to exactly what we need.
+    // Set the value to twice what we need so that we have some buffer.
+    // This *probably* won't put us over the maximum.
     resourceFromName.value = 2*cost[j].val;
   }
 
@@ -195,13 +215,12 @@ function getSingleTradeRate (button,prepay) {
 
   // now try the trade.
   beforeResources = getValues(gameCopy.resPool.resources,"value");
-  /*if (prepay) {console.log(button); button.payPrice();}
-  if (button.handler) {
-    button.handler(button); // some of these may take 0 arguments, instead
+  //button.controller.buyItem(button.model, genericEvent, function() {})
+  if(button.model.name == "Send caravan") {
+    activateCaravanTrade(button);
   } else {
-    button.onClick(genericEvent);
-  }*/
-  button.controller.buyItem(button.model, genericEvent, function() {})
+    button.controller.buyItem.bind(button.controller)(button.model, genericEvent, function() {});
+  }
   //for some reason, modifying gameCopy resources amounts changes the storage for gamePage instead.
   //we immediately correct for that.
   gamePage.upgrade(gamePage.workshop.getCraft("ship").upgrades)
@@ -214,11 +233,11 @@ function getSingleTradeRate (button,prepay) {
   return deltaResources;
 }
 
-function getAverageTradeRate (amt,button,prepay) { //slow.  There should be a faster way.
+function getAverageTradeRate (amt,button) { //slow.  There should be a faster way.
   if (amt<1) {console.error("getAverageTradeRate: needs positive trade quantity.");}
-  var rate = getSingleTradeRate(button,prepay);
+  var rate = getSingleTradeRate(button);
   for (var i=1;i<amt;i++) {
-    rate = numeric.add(rate,getSingleTradeRate(button,prepay));
+    rate = numeric.add(rate,getSingleTradeRate(button));
   }
   return numeric.div(rate,amt);
 }
@@ -275,7 +294,7 @@ function getTradeRates () {
       // all the buttons that appear here are visible
       if (gameCopy.diplomacyTab.racePanels[i].tradeBtn.model.enabled) {
         buttonlist.push(gamePage.diplomacyTab.racePanels[i].tradeBtn);
-        returns.push(getAverageTradeRate(100,gameCopy.diplomacyTab.racePanels[i].tradeBtn,true));
+        returns.push(getAverageTradeRate(100,gameCopy.diplomacyTab.racePanels[i].tradeBtn));
       }
     }
   }
@@ -285,32 +304,48 @@ function getTradeRates () {
     for (var i=0;i<gamePage.workshopTab.craftBtns.length;i++) {
       if (gamePage.workshopTab.craftBtns[i].model.visible) {
         buttonlist.push(gamePage.workshopTab.craftBtns[i]);
-        returns.push(getSingleTradeRate(gameCopy.workshopTab.craftBtns[i],false));
+        returns.push(getSingleTradeRate(gameCopy.workshopTab.craftBtns[i]));
       }
     }
   } else {
     // we can still craft catnip
     buttonlist.push(gamePage.workshopTab.craftBtns[0]);
-    returns.push(getSingleTradeRate(gameCopy.workshopTab.craftBtns[0],false));
+    returns.push(getSingleTradeRate(gameCopy.workshopTab.craftBtns[0]));
   }
 
   //religion
   if (gamePage.religionTab.visible) {
     if (gamePage.religionTab.refineBtn && gamePage.religionTab.refineBtn.visible) {
       buttonlist.push(gamePage.religionTab.refineBtn);
-      returns.push(getSingleTradeRate(gameCopy.religionTab.refineBtn,false));
+      returns.push(getSingleTradeRate(gameCopy.religionTab.refineBtn));
     }
 
     if (gamePage.religionTab.sacrificeAlicornsBtn && gamePage.religionTab.sacrificeAlicornsBtn.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeAlicornsBtn);
-      returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeAlicornsBtn,false));
+      returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeAlicornsBtn));
     }
 
     if (gamePage.religionTab.sacrificeBtn && gamePage.religionTab.sacrificeBtn.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeBtn);
-      returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeBtn,false));
+      returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeBtn));
     }
   }
+
+
+  // For debugging, verify that all the trades return *something*
+  for (var i in buttonlist) {
+    var rate = returns[i];
+    // throw a warning if we didn't actually get anything
+    var got_something = false;
+    for (var i = 0; i < rate.length; ++i) {
+      if (rate[i] > 0) {got_something = true;}
+    }
+    if (!got_something) {
+      console.log("WARNING:", buttonlist[i], "failed to generate any resources.");
+    }
+  }
+
+
   return [buttonlist,returns];
 }
 
@@ -773,6 +808,7 @@ function respawnCopy () {
   // buildings are not capped out.
   getModerateAmountOfResources(gameCopy);
   gameCopy.updateModel() // run a tick
+
 }
 
 function closeCopy() {
