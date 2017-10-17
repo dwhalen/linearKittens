@@ -280,7 +280,7 @@ function getTradeRates () {
   var returns = [];
 
   // Go through each of the actual trade rates, get the trade values, and
-  // store the actual button for gamePage in buttonlist
+  // store the actual button for gamePage in buttonList
 
   //hunt
   if (gamePage.villageTab.visible && gamePage.villageTab.huntBtn && game.science.get("archery").researched) {
@@ -885,38 +885,49 @@ function getBuildingResearchButtons() {
   // can be built.
 
   var buttonList=getActivatableButtons();
-  objects =  getObjects(gamePage);
+  //objects =  getObjects(gamePage);
 
   availablebuttons = [];
 
-  transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
-  for (var oi in objects) {
-    object = objects[oi];
-
-    if (// the faith part follows the definition of updateEnabled in religion.js
-      (object.unlocked && object.upgradable && !object.faith) ||
-      (object.stageUnlocked) ||
-      (object.unlocked && !object.researched && !object.faith) ||
-      (object.faith && !object.researched)||
-      (object.faith && object.upgradable && transcendenceResearched)
-      ) {
-      // buildable in theory
-      for (var bi=0;bi<buttonList.length;bi++) {
-        bu=buttonList[bi];
-        if (!isDefined(bu.model.metadata)) {
-          //console.log("skipping", bu);
-          continue;
-        }
-        if (!isDefined(bu.model.metadata.label)) {console.error("button.model.metadata.label not defined:", bu);}
-        if (bu.model.metadata.label==object.title||bu.model.metadata.label==object.label) {
-          //console.log("matched", object, bu);
-          break;
-        }
-      }
-      if (bi<buttonList.length) {
-        availablebuttons.push(bu);
-      }
-    }
+  // transcendenceResearched = gamePage.religion.getRU("transcendence").researched;
+  // for (var oi in objects) {
+  //   object = objects[oi];
+  //
+  //   if (// the faith part follows the definition of updateEnabled in religion.js
+  //     (object.unlocked && object.upgradable && !object.faith) ||
+  //     (object.stageUnlocked) ||
+  //     (object.unlocked && !object.researched && !object.faith) ||
+  //     (object.faith && !object.researched)||
+  //     (object.faith && object.upgradable && transcendenceResearched)
+  //     ) {
+  //     // buildable in theory
+  //     for (var bi=0;bi<buttonList.length;bi++) {
+  //       bu=buttonList[bi];
+  //       if (!isDefined(bu.model.metadata)) {
+  //         //console.log("skipping", bu);
+  //         continue;
+  //       }
+  //       if (!isDefined(bu.model.metadata.label)) {console.error("button.model.metadata.label not defined:", bu);}
+  //       if (bu.model.metadata.label==object.title||bu.model.metadata.label==object.label) {
+  //         //console.log("matched", object, bu);
+  //         break;
+  //       }
+  //     }
+  //     if (bi<buttonList.length) {
+  //       availablebuttons.push(bu);
+  //     }
+  //   }
+  // }
+  for (var b in buttonList) {
+    var button = buttonList[b];
+    //if (button.model && button.model.metadata && button.model.metadata.unlocked) {
+    if (button.tab && button.tab.tabId == "Village") {continue;}
+    if (button.model.name == "Refine catnip") {continue;}
+    //console.log(button.model.name);
+    if (button.model.name == "Gather catnip") {continue;}
+    if (button.model.metadata && button.model.metadata.researched) {continue;}
+    if (button.model.metadata && button.model.metadata.faith && button.model.metadata.on) {continue;} // activated religions
+    availablebuttons.push(button);
   }
 
   return availablebuttons;
@@ -1022,6 +1033,7 @@ function linearProgram (time) {
 
   //List the buttons that we're considering
   console.log("  Considering building:", getValues(getValues(buildableButtonList,"model"),"name"));
+  console.log(buttonCosts);
 
   // minimize objective such that matrix.x<=b
   matrixOfInequalities = [];
@@ -1414,15 +1426,16 @@ function printRealTrades() {
 
 // This will perform the specified number of trades, regardless of what the button is.
 function executePerformTrades(button, canBuild) {
+  console.log("Trying to trade", canBuild, "of", button);
   if (button.craftName) {
     //console.log("crafting resources.");
     gamePage.craft(button.craftName,canBuild);
   } else if (button.race) {
     // continue if Leviathans and duration is not positive, because this button can disappear
-    if ('duration' in button.race && (button.race.duration==0 || button.race.duration<0)) {return 0;}
+    if (button.race.name == "leviathans" && (button.race.duration==0 || button.race.duration<0)) {return 0;}
 
     //console.log("trading multiple");
-    button.tradeMultiple(canBuild);
+    gamePage.diplomacy.tradeMultiple(button.race, canBuild);
   } else {
     //try to trade one at a time...
     //console.log(button.name, canBuild);
