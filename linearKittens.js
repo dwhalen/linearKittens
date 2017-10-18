@@ -981,7 +981,7 @@ This may lead to numbers that are too low...  Maybe rescale trades?
 */
 function isBuildable (costVector, maxResources) {
   for (var i in costVector) {
-    if (costVector[i]>resourceMax[i]) {return false;}
+    if (costVector[i]>maxResources[i]) {return false;}
   }
   return true;
 }
@@ -1013,7 +1013,8 @@ function linearProgram (time) {
   for (var i in buttonList) {
     //console.log("button", buttonList[i]);
     cost = costToVector(buttonList[i].model.prices);
-    if (isBuildable(cost,numeric.sub(resourceMax,reserveResources))) {
+    if (isBuildable(cost, numeric.sub(resourceMax,reserveResources))) {
+      //console.log(buttonList[i].model.name, cost, resourceMax, reserveResources, numeric.sub(resourceMax,reserveResources));
       buttonCosts.push(cost);
       buildableButtonList.push(buttonList[i]);
     }
