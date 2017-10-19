@@ -92,7 +92,7 @@ constructionResetsPlanning = true;
 allowRepeatedBuilds = true;
 
 // Scales the trade quantities to keep them within the dynamic range of the linear programming solver.
-// Acts like the researchGlobalMax, but the trade range varies less, so we can be less careful.
+// Acts like the resourceGlobalMaxes, but the trade range varies less, so we can be less careful.
 tradeScaling = 1000;
 
 // If quadraticBuildingsOn, then magnetos, steamworks, observatories and factories will always be set to
@@ -241,6 +241,24 @@ function getAverageTradeRate (amt,button) { //slow.  There should be a faster wa
   }
   return numeric.div(rate,amt);
 }
+function setCopyResourcesToMidpoint() {
+  var resArray = gameCopy.resPool.resources;
+  for (var i in resArray){
+    var res = resArray[i];
+    if (res.maxValue == 0) {
+      // no cap on resources; set to some random number
+      // I don't know whether trade ships actually influence resource generation,
+      // but let's be safe for now.
+      //if (res.name != "ship") {res.value = 0;}
+
+      // on second thought, I don't think there are any buildings that actually
+      // consume uncapped resources, so we can just leave these as they are.
+    } else {
+      // half of the max resources
+      res.value = res.maxValue / 2;
+    }
+  }
+}
 function setCopyResourcesToZero () {
   resArray = gameCopy.resPool.resources;
   for (var i=0;i<resArray.length;i++) {
@@ -351,8 +369,8 @@ function getTradeRates () {
 
 // Find the production rate associated with a building.
 function getProductionRateForBuilding (bld) {
-  var togglable = bld.togglable;
-  var tunable = bld.tunable;
+  var togglable = bld.togglableOnOff;
+  var tunable = bld.togglable;
   if (!togglable && !tunable) {
     return numeric.mul(productionVector(gameCopy),0);
   }
@@ -360,11 +378,9 @@ function getProductionRateForBuilding (bld) {
   // turn them all off
   bld.on=0;
   var beforeResources=productionVector(gameCopy) ;
-
   // turn all of our buildings on
   bld.on=bld.val;
-  bld.on=3;
-
+  bld.action(bld, gameCopy); // update effects if resource limited
   var afterResources=productionVector(gameCopy);
   var deltaResources = numeric.sub(afterResources,beforeResources);
 
@@ -400,6 +416,14 @@ function getNullProductionRate () {
 
 // finds a list of all buildables
 function getObjects(game) {
+  //	 * game.bld.buildingsData
+	//  * game.religion.zigguratUpgrades
+	//  * game.religion.religionUpgrades
+	//  * game.religion.transcendenceUpgrades
+	//  * game.space.programs
+	//  * for each buildings of game.space.planets
+	//  * game.time.chronoforgeUpgrades
+	//  * game.time.voidspaceUpgrades
   var objects =  [].concat(
     game.bld.meta[0].meta,
     game.science.techs,
@@ -533,7 +557,7 @@ function getTogglableBuildings () {
       continue;
     }
 
-    if(bld.val>0 && (bld.togglable||bld.tunable)){
+    if(bld.val>0 && (bld.togglable||bld.togglableOnOff)){
       bldlist.push(bld);
       copybldlist.push(copybld);
     }
@@ -543,6 +567,7 @@ function getTogglableBuildings () {
 }
 
 function getBuildingRates() {
+  setCopyResourcesToMidpoint()
   var returns = [];
   var temp = getTogglableBuildings();
   var bldlist = temp[0];
@@ -1466,11 +1491,12 @@ function executeLoop () {
   for(var i in bldList) {
     var bld = bldList[i];
     var fOn = bldsToDo[i];
-    if (!bld.tunable) {
+    if (!bld.togglableOnOff) {
       // all on or all off
       if  (fOn>loop3Counter/10) {bld.on=bld.val;} else {bld.on=0;}
     } else {
       //actually tunable
+      console.assert(bld.togglable);
       var shouldBeOn = fOn*bld.val;
       var alwaysOn = Math.floor(shouldBeOn);
       var lastone = shouldBeOn-alwaysOn;
