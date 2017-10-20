@@ -129,6 +129,7 @@ function buildableWeight(button) {
   return 1;
 }
 
+var priorBuilds = {};
 
 // The function that generates the resource caps.  This can be customized as desired.
 function getResourceMax(resource) {
@@ -1285,16 +1286,23 @@ function linearProgram (time) {
 
   // Now print the results
   console.log("  Planned constructions:");
+  var currentBuilds = {};
   for (var i in buttonCompleteness) {
-    if (buttonCompleteness[i]>0.001) {
-      console.log("   ",buildableButtonList[i].model.name,":",Math.round(100*buttonCompleteness[i]),"%");
+    var button = buildableButtonList[i];
+    if (buttonCompleteness[i]>0.001 || priorBuilds[button.model.name]) {
+      var predComplete = Math.round(100*buttonCompleteness[i]);
+      var prevComplete = priorBuilds[button.model.name] || 0;
+      var deltaComplete = predComplete - prevComplete;
+      console.log("   " + (button.model.name + ": ").padEnd(15) + predComplete + "% ("+(deltaComplete>=0?'+':'') + deltaComplete+"%)");
+      if (predComplete) {currentBuilds[button.model.name] = predComplete;}
     }
   }
+  priorBuilds = currentBuilds;
 
   console.log("  Buildings used:");
   for(var i in bldsToDo) {
     if(bldsToDo[i]>1.0e-4) {
-      console.log("   ",bldList[i].label||bldList[i].title,":",Math.round(100*bldsToDo[i]), "%");
+      console.log("   ",(bldList[i].label||bldList[i].title).padEnd(15),":",Math.round(100*bldsToDo[i]), "%");
     }
   }
 
