@@ -381,7 +381,7 @@ function getProductionRateForBuilding (bld) {
   var beforeResources=productionVector(gameCopy) ;
   // turn all of our buildings on
   bld.on=bld.val;
-  bld.action(bld, gameCopy); // update effects if resource limited
+  if (bld.action) {bld.action(bld, gameCopy);} // update effects if resource limited
   var afterResources=productionVector(gameCopy);
   var deltaResources = numeric.sub(afterResources,beforeResources);
 
