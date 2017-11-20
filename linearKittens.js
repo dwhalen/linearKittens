@@ -334,17 +334,17 @@ function getTradeRates () {
 
   //religion
   if (gamePage.religionTab.visible) {
-    if (gamePage.religionTab.refineBtn && gamePage.religionTab.refineBtn.visible) {
+    if (gamePage.religionTab.refineBtn && gamePage.religionTab.refineBtn.model.visible) {
       buttonlist.push(gamePage.religionTab.refineBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.refineBtn));
     }
 
-    if (gamePage.religionTab.sacrificeAlicornsBtn && gamePage.religionTab.sacrificeAlicornsBtn.visible) {
+    if (gamePage.religionTab.sacrificeAlicornsBtn && gamePage.religionTab.sacrificeAlicornsBtn.model.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeAlicornsBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeAlicornsBtn));
     }
 
-    if (gamePage.religionTab.sacrificeBtn && gamePage.religionTab.sacrificeBtn.visible) {
+    if (gamePage.religionTab.sacrificeBtn && gamePage.religionTab.sacrificeBtn.model.visible) {
       buttonlist.push(gamePage.religionTab.sacrificeBtn);
       returns.push(getSingleTradeRate(gameCopy.religionTab.sacrificeBtn));
     }
